@@ -1,0 +1,58 @@
+{
+  "version": "1.0.0",
+  "mappings": {
+    "pcam": {
+      "task": "lymph_node_metastasis_detection",
+      "problem_type": "binary_classification",
+      "canonical_classes": ["normal", "metastasis"],
+      "to_standardized_id": {
+        "0": 0,
+        "1": 1,
+        "normal": 0,
+        "negative": 0,
+        "tumor": 1,
+        "metastasis": 1,
+        "positive": 1
+      },
+      "to_label_name": {
+        "0": "normal",
+        "1": "metastasis"
+      }
+    },
+    "breakhis": {
+      "task": "breast_cancer_malignancy_detection",
+      "problem_type": "binary_classification",
+      "canonical_classes": ["benign", "malignant"],
+      "to_standardized_id": {
+        "benign": 0,
+        "malignant": 1,
+        "b": 0,
+        "m": 1,
+        "adenosis": 0,
+        "fibroadenoma": 0,
+        "phyllodes_tumor": 0,
+        "tubular_adenoma": 0,
+        "ductal_carcinoma": 1,
+        "lobular_carcinoma": 1,
+        "mucinous_carcinoma": 1,
+        "papillary_carcinoma": 1,
+        "0": 0,
+        "1": 1
+      },
+      "to_label_name": {
+        "0": "benign",
+        "1": "malignant"
+      },
+      "subtypes": {
+        "A": "adenosis",
+        "F": "fibroadenoma",
+        "PT": "phyllodes_tumor",
+        "TA": "tubular_adenoma",
+        "DC": "ductal_carcinoma",
+        "LC": "lobular_carcinoma",
+        "MC": "mucinous_carcinoma",
+        "PC": "papillary_carcinoma"
+      }
+    }
+  }
+}

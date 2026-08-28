@@ -1,0 +1,74 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-08-28T00:00:00Z",
+  "sources": {
+    "pcam": {
+      "source_id": "pcam",
+      "dataset_name": "PatchCamelyon",
+      "dataset_version": "v1.0",
+      "task": "lymph_node_metastasis_detection",
+      "cancer_type": "breast_cancer_lymph_node_metastasis",
+      "problem_type": "binary_classification",
+      "organ": "lymph_node",
+      "staining": "H&E",
+      "image_format": "PNG",
+      "native_dimensions": [96, 96, 3],
+      "center_roi_dimensions": [32, 32],
+      "magnification": "10x",
+      "original_labels": {
+        "0": "negative_no_tumor_tissue",
+        "1": "positive_contains_tumor_tissue"
+      },
+      "standardized_labels": {
+        "0": "normal",
+        "1": "metastasis"
+      },
+      "default_dir": "data/raw/pcam",
+      "license": "CC0: Public Domain",
+      "source_url": "https://github.com/basveeling/pcam",
+      "citation": "Veeling, B. S., Linmans, J., Winkens, J., Cohen, T., & Welling, M. (2018). Rotation Equivariant CNNs for Digital Pathology. In Medical Image Computing and Computer Assisted Intervention – MICCAI 2018 (pp. 210-218). Springer, Cham.",
+      "download_strategy": "automated_or_kaggle",
+      "patient_id_available": false,
+      "slide_id_available": false
+    },
+    "breakhis": {
+      "source_id": "breakhis",
+      "dataset_name": "Breast Cancer Histopathological Image Classification (BreaKHis)",
+      "dataset_version": "v1.0",
+      "task": "breast_cancer_malignancy_detection",
+      "cancer_type": "breast_cancer",
+      "problem_type": "binary_classification",
+      "organ": "breast",
+      "staining": "H&E",
+      "image_format": "PNG",
+      "native_dimensions": [700, 460, 3],
+      "center_roi_dimensions": null,
+      "magnification": ["40X", "100X", "200X", "400X"],
+      "original_labels": {
+        "benign": [
+          "adenosis",
+          "fibroadenoma",
+          "phyllodes_tumor",
+          "tubular_adenoma"
+        ],
+        "malignant": [
+          "ductal_carcinoma",
+          "lobular_carcinoma",
+          "mucinous_carcinoma",
+          "papillary_carcinoma"
+        ]
+      },
+      "standardized_labels": {
+        "0": "benign",
+        "1": "malignant"
+      },
+      "default_dir": "data/raw/breakhis",
+      "license": "Academic Free License (Non-commercial research use)",
+      "source_url": "https://web.inf.ufpr.br/vri/databases/breast-cancer-histopathological-database-breakhis/",
+      "citation": "Spanhol, F. A., Oliveira, L. S., Petitjean, C., & Heutte, L. (2016). A Dataset for Breast Cancer Histopathological Image Classification. IEEE Transactions on Biomedical Engineering, 63(7), 1455-1462.",
+      "download_strategy": "manual_or_direct_url",
+      "patient_id_available": true,
+      "slide_id_available": true
+    }
+  }
+}

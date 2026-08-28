@@ -66,12 +66,22 @@ coverage.xml
 .docker/
 
 # =============================================================================
-# ML / Data (for future phases)
+# ML / Data
 # =============================================================================
 *.pth
 *.pt
 *.onnx
 *.h5
-data/
+*.hdf5
+*.ckpt
+
+# Ignore raw, interim, and processed dataset directories
+data/raw/
+data/interim/
+data/processed/
+!data/metadata/
+!data/README.md
+
 datasets/
 mlruns/
+reports/generated/
