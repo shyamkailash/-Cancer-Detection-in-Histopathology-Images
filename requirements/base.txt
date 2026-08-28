@@ -1,0 +1,15 @@
+# Django and REST Framework
+Django>=4.2,<5.1
+djangorestframework>=3.14,<4.0
+
+# Database
+psycopg2-binary>=2.9.9,<3.0
+
+# Configuration
+python-decouple>=3.8,<4.0
+
+# Logging
+python-json-logger>=2.0.7,<3.0
+
+# Production server
+gunicorn>=21.2.0,<23.0
