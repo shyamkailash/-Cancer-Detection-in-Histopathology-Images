@@ -15,3 +15,4 @@ def test_expected_health_keys_fixture(expected_health_keys):
     assert 'timestamp' in expected_health_keys
     assert 'components' in expected_health_keys
     assert 'environment' in expected_health_keys
+
