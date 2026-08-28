@@ -68,3 +68,4 @@ class ImageQualityChecker:
             "is_mostly_background": is_mostly_background,
             "is_low_contrast": is_low_contrast,
         }
+

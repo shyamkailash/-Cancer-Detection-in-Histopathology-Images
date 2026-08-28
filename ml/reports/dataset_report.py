@@ -155,3 +155,4 @@ class DatasetReportGenerator:
         md_text = self.generate_markdown(report)
         with open(path, "w", encoding="utf-8") as f:
             f.write(md_text)
+

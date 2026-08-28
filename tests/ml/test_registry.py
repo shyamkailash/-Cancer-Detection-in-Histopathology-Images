@@ -58,3 +58,4 @@ def test_register_source_missing_required_fields():
     registry = DatasetRegistry()
     with pytest.raises(ValueError):
         registry.register_source("incomplete", {"source_id": "incomplete"})
+

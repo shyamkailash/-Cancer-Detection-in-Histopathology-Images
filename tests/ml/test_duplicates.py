@@ -37,3 +37,4 @@ def test_duplicate_detector_cross_source_duplicates():
     cross_dups = detector.find_cross_source_duplicates([s1, s2])
     assert "shared_hash" in cross_dups
     assert len(cross_dups["shared_hash"]) == 2
+

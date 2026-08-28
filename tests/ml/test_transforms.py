@@ -80,3 +80,4 @@ def test_image_quality_checker_whitespace_and_blur():
     assert "whitespace_ratio" in quality_assessment
     assert "blurriness_laplacian_var" in quality_assessment
     assert "contrast_std" in quality_assessment
+

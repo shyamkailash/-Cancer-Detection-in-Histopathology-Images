@@ -57,3 +57,4 @@ class SampleRecord:
         if path.is_absolute() or base_dir is None:
             return path
         return (base_dir / path).resolve()
+

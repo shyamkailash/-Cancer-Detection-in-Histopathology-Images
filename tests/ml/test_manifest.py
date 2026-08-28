@@ -94,3 +94,4 @@ def test_manifest_csv_and_jsonl_roundtrip(tmp_path):
     assert loaded_csv.samples[0].sample_id == "s1"
     assert loaded_csv.samples[0].image_width == 96
     assert loaded_csv.samples[0].is_valid is True
+

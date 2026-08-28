@@ -37,3 +37,4 @@ data/
 2. Implement metadata extraction, sample discovery, and source-specific label mapping.
 3. Register the source in `data/metadata/dataset_registry.json`.
 4. Run validation and manifest generation via `python scripts/build_manifest.py --source <source_name>`.
+

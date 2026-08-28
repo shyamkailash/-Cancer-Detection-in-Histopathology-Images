@@ -64,3 +64,4 @@ def test_dataset_report_generator_json_and_markdown(tmp_path):
 
     assert json_file.exists()
     assert md_file.exists()
+

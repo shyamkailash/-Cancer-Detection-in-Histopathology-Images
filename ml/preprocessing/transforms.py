@@ -211,3 +211,4 @@ def get_eval_transforms(
         ToTensorTransform(),
         NormalizeTransform(mean=mean, std=std),
     ])
+

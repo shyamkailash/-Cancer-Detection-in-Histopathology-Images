@@ -73,3 +73,4 @@ class DatasetRegistry:
         if validation_status is not None:
             source["validation_status"] = validation_status
         self._sources[source_id] = source
+

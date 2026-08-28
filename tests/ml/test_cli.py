@@ -69,3 +69,4 @@ def test_build_manifest_and_validate_cli_execution(tmp_path):
     assert res_val.returncode == 0
     assert (reports_dir / "pcam_validation_report.json").exists()
     assert (reports_dir / "pcam_validation_report.md").exists()
+

@@ -82,3 +82,4 @@ def test_breakhis_source_discovery(tmp_path):
     assert s1.label_name == "malignant"
     assert s1.patient_id == "14-5678"
     assert s1.magnification == "200X"
+

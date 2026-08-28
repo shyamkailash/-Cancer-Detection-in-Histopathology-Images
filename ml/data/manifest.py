@@ -212,3 +212,4 @@ class DatasetManifest:
 
     def __iter__(self):
         return iter(self.samples)
+
