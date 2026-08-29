@@ -153,7 +153,28 @@ python scripts/generate_plots.py
 python scripts/generate_comparison_report.py
 ```
 
-### F. Run Complete Unit & Integration Test Suite (61 Tests)
+### F. Run Prediction & Grad-CAM Explainability (CLI)
+```bash
+# Run cancer detection & generate Grad-CAM heatmaps
+python scripts/predict_image.py \
+    --image path/to/patch.png \
+    --model centralized \
+    --output-dir artifacts/predictions/
+```
+
+### G. Start Django REST API & Interactive Demonstration UI
+```bash
+# Start backend server
+python backend/manage.py runserver 0.0.0.0:8000
+
+# Open interactive demo in browser:
+# http://localhost:8000/api/demo/
+# REST Endpoints:
+# - POST /api/predict/ (multipart image upload, returns cancer probabilities + Grad-CAM base64)
+# - GET  /api/models/  (list available centralized, fedavg, and dp_fedavg models)
+```
+
+### H. Run Complete Unit & Integration Test Suite (71 Tests)
 ```bash
 pytest -v
 ```

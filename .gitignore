@@ -88,3 +88,5 @@ reports/generated/
 # Generated PCam manifests
 data/metadata/manifests/pcam_manifest.csv
 data/metadata/manifests/pcam_manifest.jsonl
+artifacts/predictions/*.png
+

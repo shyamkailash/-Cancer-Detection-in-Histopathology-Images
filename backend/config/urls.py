@@ -18,6 +18,9 @@ def api_root(request):
         'version': '0.1.0',
         'endpoints': {
             'health': '/api/health/',
+            'predict': '/api/predict/',
+            'models': '/api/models/',
+            'demo': '/api/demo/',
             'admin': '/admin/',
         }
     })
@@ -27,4 +30,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', api_root, name='api-root'),
     path('api/', include('apps.core.urls')),
+    path('api/', include('apps.predictions.urls')),
 ]

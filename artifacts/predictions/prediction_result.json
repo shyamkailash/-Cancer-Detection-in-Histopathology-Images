@@ -1,0 +1,37 @@
+{
+  "status": "success",
+  "prediction": {
+    "class_id": 0,
+    "class_name": "normal",
+    "description": "Normal Lymph Node Tissue (No Tumor Detected)",
+    "confidence": 0.5381,
+    "probabilities": {
+      "normal": 0.5381,
+      "metastasis": 0.4619
+    }
+  },
+  "model": {
+    "id": "fedavg",
+    "display_name": "Federated ResNet-18 (FedAvg)",
+    "paradigm": "Federated Learning",
+    "device": "cuda:0"
+  },
+  "image_metadata": {
+    "original_width": 96,
+    "original_height": 96,
+    "input_channels": 3,
+    "processed_size": [
+      96,
+      96
+    ]
+  },
+  "explainability": {
+    "method": "Grad-CAM",
+    "target_layer": "layer4",
+    "explained_class_id": 0,
+    "explained_class_name": "normal",
+    "saved_visuals_dir": "/home/shyamkailash-s/Desktop/SEMESTER/Cancer-Detection-Histopathology/artifacts/predictions"
+  },
+  "inference_time_ms": 568.39,
+  "disclaimer": "Academic & Research Prototype. Not approved for medical diagnosis or clinical use."
+}
