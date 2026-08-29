@@ -1,0 +1,36 @@
+{
+  "experiment_name": "centralized_resnet18_baseline",
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+  "num_parameters": 11177538,
+  "epochs": 1,
+  "batch_size": 32,
+  "train_samples": 154018,
+  "val_samples": 33004,
+  "test_samples": 33003,
+  "train_metrics": {
+    "loss": 0.22541587422512324,
+    "accuracy": 0.9122115596878287
+  },
+  "val_metrics": {
+    "loss": 0.16006149217863833,
+    "accuracy": 0.9427039146770089
+  },
+  "test_metrics": {
+    "accuracy": 0.9413083659061298,
+    "sensitivity": 0.8967606792848059,
+    "specificity": 0.9716337339580362,
+    "precision": 0.9555963010204082,
+    "f1_score": 0.9252441048203465,
+    "roc_auc": 0.9822171351316333,
+    "confusion_matrix": {
+      "tn": 19079,
+      "fp": 557,
+      "fn": 1380,
+      "tp": 11987
+    },
+    "total_samples": 33003,
+    "loss": 0.16147473578505006
+  },
+  "training_time_seconds": 0.0
+}

@@ -70,6 +70,159 @@ class PCamSource(DatasetSource):
 
     def discover_samples(self, data_dir: Path) -> List[SampleRecord]:
         """
+        Discover PCam samples.
+
+        Supports:
+        1. Kaggle Histopathologic Cancer Detection format:
+        data/raw/pcam/
+        ├── train/
+        ├── test/
+        └── train_labels.csv
+
+        2. Folder-based datasets:
+        ├── 0/
+        └── 1/
+        """
+
+        import csv
+
+        root = Path(data_dir)
+        samples: List[SampleRecord] = []
+
+        if not root.exists():
+            return samples
+
+        # --------------------------------------------------
+        # Kaggle PCam format
+        # --------------------------------------------------
+
+        train_dir = root / "train"
+        labels_file = root / "train_labels.csv"
+
+        if train_dir.exists() and labels_file.exists():
+
+            print(f"Detected Kaggle PCam dataset format.")
+
+            # Load image ID -> label mapping
+            label_map: Dict[str, int] = {}
+
+            with open(labels_file, "r", encoding="utf-8") as f:
+                reader = csv.DictReader(f)
+
+                for row in reader:
+                    image_id = row["id"]
+                    label = int(row["label"])
+
+                    label_map[image_id] = label
+
+            print(f"Loaded {len(label_map)} labels.")
+
+            # Process labeled training images
+            for filepath in sorted(train_dir.iterdir()):
+
+                if not filepath.is_file():
+                    continue
+
+                file_ext = filepath.suffix.lower()
+
+                if file_ext not in self.image_validator.supported_extensions:
+                    continue
+
+                image_id = filepath.stem
+
+                if image_id not in label_map:
+                    continue
+
+                raw_label = label_map[image_id]
+
+                sample = self.build_sample_record(
+                    filepath=filepath,
+                    raw_label=raw_label,
+                    magnification="10x",
+                    extra_metadata={
+                        "native_patch_size": [96, 96],
+                        "dataset_split": "original_train",
+                        "image_id": image_id,
+                    },
+                )
+
+                samples.append(sample)
+
+            return samples
+
+        # --------------------------------------------------
+        # Generic folder-based dataset format
+        # --------------------------------------------------
+
+        for dirpath, _, filenames in os.walk(root):
+
+            dir_path = Path(dirpath)
+            folder_name = dir_path.name.lower()
+
+            raw_label = None
+
+            if folder_name in (
+                "0",
+                "normal",
+                "negative",
+                "non-tumor",
+                "nontumor",
+            ):
+                raw_label = 0
+
+            elif folder_name in (
+                "1",
+                "tumor",
+                "positive",
+                "metastasis",
+                "cancer",
+            ):
+                raw_label = 1
+
+            for fname in filenames:
+
+                filepath = dir_path / fname
+                file_ext = filepath.suffix.lower()
+
+                if file_ext not in self.image_validator.supported_extensions:
+                    continue
+
+                sample_label = raw_label
+
+                if sample_label is None:
+
+                    stem = filepath.stem.lower()
+
+                    if (
+                        stem.startswith("0_")
+                        or stem.endswith("_0")
+                        or "normal" in stem
+                    ):
+                        sample_label = 0
+
+                    elif (
+                        stem.startswith("1_")
+                        or stem.endswith("_1")
+                        or "tumor" in stem
+                    ):
+                        sample_label = 1
+
+                    else:
+                        sample_label = "unknown"
+
+                sample = self.build_sample_record(
+                    filepath=filepath,
+                    raw_label=sample_label,
+                    magnification="10x",
+                    extra_metadata={
+                        "native_patch_size": [96, 96],
+                    },
+                )
+
+                samples.append(sample)
+
+        return samples
+        """
         Discover PCam samples from directory structure.
         Supports folder-based categorization (e.g. .../0/img.png, .../1/img.png, .../normal/img.png, .../tumor/img.png).
         """
