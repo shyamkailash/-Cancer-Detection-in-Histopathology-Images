@@ -34,8 +34,10 @@ COPY --from=builder /root/.local /home/appuser/.local
 # Ensure the local bin is in PATH
 ENV PATH=/home/appuser/.local/bin:$PATH
 
-# Copy application code
+# Copy application code and ML packages
 COPY backend/ /app/backend/
+COPY ml/ /app/ml/
+COPY data/metadata/ /app/data/metadata/
 COPY requirements/ /app/requirements/
 
 # Set working directory

@@ -116,12 +116,12 @@ def main():
             k: v for k, v in json_result["explainability"].items()
             if not k.endswith("_base64")
         }
-        json_result["explainability"]["saved_visuals_dir"] = str(out_dir.resolve())
+        json_result["explainability"]["saved_visuals_dir"] = str(out_dir)
 
     with open(out_dir / "prediction_result.json", "w", encoding="utf-8") as f:
         json.dump(json_result, f, indent=2)
 
-    print(f"[SAVED] Result JSON: {out_dir.resolve()}/prediction_result.json")
+    print(f"[SAVED] Result JSON: {out_dir}/prediction_result.json")
     return 0
 
 

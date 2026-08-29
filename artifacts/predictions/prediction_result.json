@@ -30,7 +30,7 @@
     "target_layer": "layer4",
     "explained_class_id": 0,
     "explained_class_name": "normal",
-    "saved_visuals_dir": "/home/shyamkailash-s/Desktop/SEMESTER/Cancer-Detection-Histopathology/artifacts/predictions"
+    "saved_visuals_dir": "artifacts/predictions"
   },
   "inference_time_ms": 568.39,
   "disclaimer": "Academic & Research Prototype. Not approved for medical diagnosis or clinical use."
