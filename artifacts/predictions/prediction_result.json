@@ -4,16 +4,16 @@
     "class_id": 0,
     "class_name": "normal",
     "description": "Normal Lymph Node Tissue (No Tumor Detected)",
-    "confidence": 0.5381,
+    "confidence": 0.867,
     "probabilities": {
-      "normal": 0.5381,
-      "metastasis": 0.4619
+      "normal": 0.867,
+      "metastasis": 0.133
     }
   },
   "model": {
-    "id": "fedavg",
-    "display_name": "Federated ResNet-18 (FedAvg)",
-    "paradigm": "Federated Learning",
+    "id": "dp_fedavg",
+    "display_name": "Privacy-Preserving Federated ResNet-18 (DP-FedAvg)",
+    "paradigm": "Privacy-Preserving Federated Learning",
     "device": "cuda:0"
   },
   "image_metadata": {
@@ -32,6 +32,6 @@
     "explained_class_name": "normal",
     "saved_visuals_dir": "artifacts/predictions"
   },
-  "inference_time_ms": 568.39,
+  "inference_time_ms": 563.19,
   "disclaimer": "Academic & Research Prototype. Not approved for medical diagnosis or clinical use."
 }
