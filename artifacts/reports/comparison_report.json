@@ -1,21 +1,18 @@
 {
-  "title": "Comparative Analysis: Centralized vs. Federated vs. Privacy-Preserving Federated Learning",
+  "title": "Comprehensive Comparative Analysis: Centralized vs. FedAvg vs. FedProx vs. FedBN vs. DP-FedAvg",
   "task": "PCam Lymph Node Metastasis Histopathology Cancer Detection",
-  "model_architecture": "ResNet-18 (ImageNet Pretrained Backbones)",
-  "hardware": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
-  "comparison_table": {
+  "model_architecture": "ResNet-18 (ImageNet Pretrained)",
+  "models": {
     "Centralized Baseline": {
-      "paradigm": "Centralized",
-      "data_access": "All raw data pooled in central storage",
-      "privacy_guarantee": "None (Raw data shared)",
-      "rounds_or_epochs": "1 Epoch (154,018 samples)",
-      "test_loss": 0.1615,
-      "accuracy": 94.13,
-      "sensitivity_recall": 89.68,
-      "specificity": 97.16,
-      "precision": 95.56,
-      "f1_score": 92.52,
-      "roc_auc": 0.9822,
+      "paradigm": "Centralized Pooled Training",
+      "status": "Evaluated",
+      "accuracy": "94.13%",
+      "sensitivity_recall": "89.68%",
+      "specificity": "97.16%",
+      "precision": "95.56%",
+      "f1_score": "92.52%",
+      "roc_auc": "0.9822",
+      "test_loss": "0.1615",
       "confusion_matrix": {
         "tn": 19079,
         "fp": 557,
@@ -23,19 +20,16 @@
         "tp": 11987
       }
     },
-    "Federated Learning (FedAvg)": {
-      "paradigm": "Federated Multi-Site (5 Simulated Sites)",
-      "data_access": "Isolated local site data, zero raw image sharing",
-      "privacy_guarantee": "Baseline FedAvg (Raw data localized, model updates shared)",
-      "rounds_or_epochs": "5 Rounds (Local Epochs: 1)",
-      "partition_strategy": "Non-IID Dirichlet (alpha=0.5)",
-      "test_loss": 0.3214,
-      "accuracy": 88.8,
-      "sensitivity_recall": 86.97,
-      "specificity": 90.07,
-      "precision": 85.87,
-      "f1_score": 86.42,
-      "roc_auc": 0.9522,
+    "Federated (FedAvg)": {
+      "paradigm": "Federated Learning (FedAvg)",
+      "status": "Evaluated",
+      "accuracy": "88.80%",
+      "sensitivity_recall": "86.97%",
+      "specificity": "90.07%",
+      "precision": "85.87%",
+      "f1_score": "86.42%",
+      "roc_auc": "0.9522",
+      "test_loss": "0.3214",
       "confusion_matrix": {
         "tn": 1733,
         "fp": 191,
@@ -43,19 +37,50 @@
         "tp": 1161
       }
     },
-    "Privacy-Preserving Federated Learning (DP-FedAvg)": {
-      "paradigm": "Federated Multi-Site + Differential Privacy",
-      "data_access": "Isolated local site data, zero raw image sharing",
-      "privacy_guarantee": "Client-Side DP (Clip Norm=1.0, Noise Std=0.05)",
-      "rounds_or_epochs": "5 Rounds (Local Epochs: 1)",
-      "partition_strategy": "Non-IID Dirichlet (alpha=0.5)",
-      "test_loss": 0.6287,
-      "accuracy": 67.2,
-      "sensitivity_recall": 28.31,
-      "specificity": 94.18,
-      "precision": 77.14,
-      "f1_score": 41.42,
-      "roc_auc": 0.737,
+    "Federated (FedProx)": {
+      "paradigm": "Federated Learning (FedProx, mu=0.01)",
+      "status": "Evaluated",
+      "accuracy": "84.07%",
+      "sensitivity_recall": "72.26%",
+      "specificity": "92.44%",
+      "precision": "87.15%",
+      "f1_score": "79.01%",
+      "roc_auc": "0.9138",
+      "test_loss": "0.3738",
+      "confusion_matrix": {
+        "tn": 893,
+        "fp": 73,
+        "fn": 190,
+        "tp": 495
+      }
+    },
+    "Federated (FedBN)": {
+      "paradigm": "Federated Learning (Local BatchNorm)",
+      "status": "Evaluated",
+      "accuracy": "59.96%",
+      "sensitivity_recall": "5.40%",
+      "specificity": "98.65%",
+      "precision": "74.00%",
+      "f1_score": "10.07%",
+      "roc_auc": "0.6636",
+      "test_loss": "0.9097",
+      "confusion_matrix": {
+        "tn": 953,
+        "fp": 13,
+        "fn": 648,
+        "tp": 37
+      }
+    },
+    "Privacy-Preserving (DP-FedAvg)": {
+      "paradigm": "Federated Learning + DP (C=1.0, sigma=0.05)",
+      "status": "Evaluated",
+      "accuracy": "67.20%",
+      "sensitivity_recall": "28.31%",
+      "specificity": "94.18%",
+      "precision": "77.14%",
+      "f1_score": "41.42%",
+      "roc_auc": "0.7370",
+      "test_loss": "0.6287",
       "confusion_matrix": {
         "tn": 1812,
         "fp": 112,

@@ -34,10 +34,12 @@ def test_models_list_endpoint(api_client):
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert data["status"] == "success"
-    assert len(data["models"]) >= 3
+    assert len(data["models"]) >= 5
     model_ids = [m["id"] for m in data["models"]]
     assert "centralized" in model_ids
     assert "fedavg" in model_ids
+    assert "fedprox" in model_ids
+    assert "fedbn" in model_ids
     assert "dp_fedavg" in model_ids
 
 
@@ -89,6 +91,27 @@ def test_predict_endpoint_base64_payload(api_client):
     assert data["status"] == "success"
     assert data["model"]["id"] == "fedavg"
     assert data["explainability"] is None
+
+
+def test_predict_endpoint_fedprox_and_fedbn(api_client):
+    """Test POST /api/predict/ with fedprox and fedbn model selections."""
+    img_file_prox = create_test_image_file("patch_prox.png")
+    resp_prox = api_client.post(
+        "/api/predict/",
+        data={"image": img_file_prox, "model_name": "fedprox"},
+        format="multipart",
+    )
+    assert resp_prox.status_code == status.HTTP_200_OK
+    assert resp_prox.json()["model"]["id"] == "fedprox"
+
+    img_file_bn = create_test_image_file("patch_bn.png")
+    resp_bn = api_client.post(
+        "/api/predict/",
+        data={"image": img_file_bn, "model_name": "fedbn"},
+        format="multipart",
+    )
+    assert resp_bn.status_code == status.HTTP_200_OK
+    assert resp_bn.json()["model"]["id"] == "fedbn"
 
 
 def test_predict_endpoint_missing_image(api_client):

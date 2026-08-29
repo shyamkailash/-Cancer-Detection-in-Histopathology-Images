@@ -1,11 +1,11 @@
 """
 Federated Server Coordinator for multi-site federated learning.
-Manages global rounds, client selection, FedAvg aggregation, global validation, and testing.
+Manages global rounds, client selection, aggregation (FedAvg/FedBN), global validation, and testing.
 """
 
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Callable
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,12 +15,14 @@ from ml.models.resnet import create_resnet18
 from ml.evaluation.metrics import evaluate_model
 from .client import FederatedClient
 from .aggregation import federated_averaging
+from .fedbn import aggregate_fedbn
+from .utils import estimate_model_size_mb, estimate_communication_volume
 
 
 class FederatedServer:
     """
     Central coordinator for Federated Learning.
-    Dispatches global model parameters to clients, aggregates updates with FedAvg,
+    Dispatches global model parameters to clients, aggregates updates (FedAvg / FedBN),
     and performs centralized validation and testing on untouched global splits.
     """
 
@@ -32,6 +34,7 @@ class FederatedServer:
         device: torch.device,
         initial_model: Optional[nn.Module] = None,
         client_fraction: float = 1.0,
+        algorithm: str = "fedavg",
         seed: int = 42,
         checkpoint_dir: str = "artifacts/federated",
     ):
@@ -40,6 +43,7 @@ class FederatedServer:
         self.test_loader = test_loader
         self.device = device
         self.client_fraction = client_fraction
+        self.algorithm = algorithm.lower()
         self.seed = seed
         self.checkpoint_dir = Path(checkpoint_dir)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -65,6 +69,15 @@ class FederatedServer:
         selected_indices = round_rng.choice(num_total, size=num_select, replace=False)
         return [self.clients[i] for i in selected_indices]
 
+    def aggregate(self, client_updates: List[tuple]) -> Dict[str, torch.Tensor]:
+        """Aggregate client updates according to selected algorithm."""
+        if self.algorithm == "fedbn":
+            base_state = {k: v.cpu().clone() for k, v in self.global_model.state_dict().items()}
+            return aggregate_fedbn(client_updates, base_state_dict=base_state)
+        else:
+            # Standard FedAvg / FedProx / DP-FedAvg parameter weighting
+            return federated_averaging(client_updates)
+
     def fit(self, rounds: int = 5) -> Dict[str, Any]:
         """
         Execute federated training rounds.
@@ -74,14 +87,17 @@ class FederatedServer:
         best_round = 0
         start_time = time.time()
 
+        model_size_mb = estimate_model_size_mb(self.global_model)
+
         print("\n" + "=" * 65)
-        print(f"Starting Federated Learning Training ({rounds} Rounds, {len(self.clients)} Sites)")
+        print(f"Starting Federated Learning Training ({self.algorithm.upper()})")
+        print(f"Rounds: {rounds} | Total Sites: {len(self.clients)} | Fraction: {self.client_fraction}")
         print("=" * 65)
 
         for r in range(1, rounds + 1):
             round_start = time.time()
             print(f"\n============================================================")
-            print(f"Federated Round {r}/{rounds}")
+            print(f"Federated Round {r}/{rounds} [{self.algorithm.upper()}]")
             print(f"============================================================")
 
             selected_clients = self.select_clients(r)
@@ -107,9 +123,9 @@ class FederatedServer:
                 })
                 print(f"    Samples: {res['num_samples']} | Loss: {res['train_loss']:.4f} | Acc: {res['train_accuracy'] * 100:.2f}%")
 
-            # Perform FedAvg aggregation
-            print(f"\nAggregating {len(client_updates)} client updates using FedAvg...")
-            aggregated_state = federated_averaging(client_updates)
+            # Perform aggregation
+            print(f"\nAggregating {len(client_updates)} client updates using {self.algorithm.upper()}...")
+            aggregated_state = self.aggregate(client_updates)
 
             # Update global model
             self.global_model.load_state_dict(aggregated_state)
@@ -146,6 +162,7 @@ class FederatedServer:
                 torch.save(
                     {
                         "round": r,
+                        "algorithm": self.algorithm,
                         "model_state_dict": self.global_model.state_dict(),
                         "val_metrics": val_metrics,
                     },
@@ -160,6 +177,7 @@ class FederatedServer:
         torch.save(
             {
                 "round": rounds,
+                "algorithm": self.algorithm,
                 "model_state_dict": self.global_model.state_dict(),
                 "history": history,
             },
@@ -169,7 +187,7 @@ class FederatedServer:
 
         # Final Global Evaluation on untouched test set
         print("\n" + "=" * 60)
-        print("Evaluating Final Aggregated Global Model on Test Set")
+        print(f"Evaluating Final {self.algorithm.upper()} Model on Test Set")
         print("=" * 60)
 
         test_metrics = evaluate_model(
@@ -189,12 +207,20 @@ class FederatedServer:
             print(f"Global Test ROC-AUC:     {test_metrics['roc_auc']:.4f}")
         print(f"Total Training Time:     {total_training_time:.2f}s")
 
+        avg_clients_per_round = int(round(len(self.clients) * self.client_fraction))
+        comm_stats = estimate_communication_volume(
+            num_rounds=rounds,
+            num_participating_clients_per_round=avg_clients_per_round,
+            model_size_mb=model_size_mb,
+        )
+
         return {
+            "algorithm": self.algorithm,
             "rounds": rounds,
             "best_round": best_round,
             "best_val_accuracy": best_val_acc,
             "history": history,
             "test_metrics": test_metrics,
             "total_training_time": total_training_time,
+            "communication_stats": comm_stats,
         }
-

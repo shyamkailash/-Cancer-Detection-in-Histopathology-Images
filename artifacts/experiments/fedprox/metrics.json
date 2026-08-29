@@ -1,0 +1,97 @@
+{
+  "algorithm": "fedprox",
+  "best_round": 1,
+  "best_val_accuracy": 0.8305519897304237,
+  "total_training_time_seconds": 19.27959156036377,
+  "communication_stats": {
+    "model_size_mb": 42.68,
+    "rounds": 1,
+    "clients_per_round": 5,
+    "per_round_mb": 426.76,
+    "total_communication_mb": 426.76,
+    "total_communication_gb": 0.417,
+    "note": "Estimated bidirectional network payload (float32 parameter transfers, excluding protocol overhead)."
+  },
+  "test_metrics": {
+    "accuracy": 0.8407026044821321,
+    "sensitivity": 0.7226277372262774,
+    "specificity": 0.9244306418219461,
+    "precision": 0.8714788732394366,
+    "f1_score": 0.7901037509976057,
+    "roc_auc": 0.9138247872935273,
+    "confusion_matrix": {
+      "tn": 893,
+      "fp": 73,
+      "fn": 190,
+      "tp": 495
+    },
+    "total_samples": 1651,
+    "loss": 0.3738096802975466
+  },
+  "history": [
+    {
+      "round": 1,
+      "duration_seconds": 19.233067989349365,
+      "participating_clients": [
+        "site_1",
+        "site_2",
+        "site_3",
+        "site_4",
+        "site_5"
+      ],
+      "client_metrics": [
+        {
+          "client_id": "site_1",
+          "site_name": "Hospital A (Simulated Site)",
+          "num_samples": 2545,
+          "train_loss": 0.5234585755349143,
+          "train_accuracy": 0.7709233791748527
+        },
+        {
+          "client_id": "site_2",
+          "site_name": "Hospital B (Simulated Site)",
+          "num_samples": 1926,
+          "train_loss": 0.2798075603856971,
+          "train_accuracy": 0.9003115264797508
+        },
+        {
+          "client_id": "site_3",
+          "site_name": "Hospital C (Simulated Site)",
+          "num_samples": 489,
+          "train_loss": 0.4435453385663179,
+          "train_accuracy": 0.8159509202453987
+        },
+        {
+          "client_id": "site_4",
+          "site_name": "Hospital D (Simulated Site)",
+          "num_samples": 1293,
+          "train_loss": 0.14648858107459334,
+          "train_accuracy": 0.982985305491106
+        },
+        {
+          "client_id": "site_5",
+          "site_name": "Hospital E (Simulated Site)",
+          "num_samples": 1484,
+          "train_loss": 0.5902447699697191,
+          "train_accuracy": 0.727088948787062
+        }
+      ],
+      "global_val_metrics": {
+        "accuracy": 0.8305519897304237,
+        "sensitivity": 0.7302325581395349,
+        "specificity": 0.9014238773274917,
+        "precision": 0.839572192513369,
+        "f1_score": 0.7810945273631842,
+        "roc_auc": 0.9134703719741546,
+        "confusion_matrix": {
+          "tn": 823,
+          "fp": 90,
+          "fn": 174,
+          "tp": 471
+        },
+        "total_samples": 1558,
+        "loss": 0.3739811366039002
+      }
+    }
+  ]
+}

@@ -25,10 +25,14 @@ def test_model_manager_list_and_canonicalize():
     assert len(models) == len(MODEL_REGISTRY_CONFIG)
     assert any(m["id"] == "centralized" for m in models)
     assert any(m["id"] == "fedavg" for m in models)
+    assert any(m["id"] == "fedprox" for m in models)
+    assert any(m["id"] == "fedbn" for m in models)
     assert any(m["id"] == "dp_fedavg" for m in models)
 
     assert manager.canonicalize_model_name("baseline") == "centralized"
     assert manager.canonicalize_model_name("federated") == "fedavg"
+    assert manager.canonicalize_model_name("proximal") == "fedprox"
+    assert manager.canonicalize_model_name("batchnorm") == "fedbn"
     assert manager.canonicalize_model_name("privacy_federated") == "dp_fedavg"
 
 

@@ -177,6 +177,8 @@ class DemoView(APIView):
                     <select id="modelSelect">
                         <option value="centralized">Centralized ResNet-18 (94.13% Acc)</option>
                         <option value="fedavg">Federated ResNet-18 FedAvg (88.80% Acc)</option>
+                        <option value="fedprox">Federated ResNet-18 FedProx (mu=0.01)</option>
+                        <option value="fedbn">Federated ResNet-18 FedBN (Local BatchNorm)</option>
                         <option value="dp_fedavg">Privacy-Preserving DP-FedAvg (67.20% Acc)</option>
                     </select>
                 </div>
