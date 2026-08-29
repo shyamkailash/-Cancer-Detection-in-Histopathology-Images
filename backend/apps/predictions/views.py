@@ -325,3 +325,4 @@ class DemoView(APIView):
 </body>
 </html>"""
         return HttpResponse(html_content, content_type="text/html")
+

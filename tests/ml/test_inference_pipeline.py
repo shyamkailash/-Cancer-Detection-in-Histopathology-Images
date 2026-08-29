@@ -82,3 +82,4 @@ def test_inference_pipeline_predict():
     assert "heatmap_base64" in result["explainability"]
     assert "overlay_base64" in result["explainability"]
     assert result["inference_time_ms"] > 0
+

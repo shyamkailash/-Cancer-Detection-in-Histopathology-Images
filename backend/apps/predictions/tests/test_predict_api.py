@@ -119,3 +119,4 @@ def test_demo_view_endpoint(api_client):
     assert response.status_code == status.HTTP_200_OK
     assert "text/html" in response["Content-Type"]
     assert b"Privacy-Preserving Federated Cancer Detection" in response.content
+

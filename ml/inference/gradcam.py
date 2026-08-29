@@ -180,3 +180,4 @@ class GradCAM:
 
     def __del__(self):
         self.remove_hooks()
+

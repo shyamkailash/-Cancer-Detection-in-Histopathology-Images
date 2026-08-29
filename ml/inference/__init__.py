@@ -16,3 +16,4 @@ __all__ = [
     "InferencePipeline",
     "get_inference_pipeline",
 ]
+

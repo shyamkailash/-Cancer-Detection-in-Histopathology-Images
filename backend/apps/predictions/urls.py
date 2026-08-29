@@ -12,3 +12,4 @@ urlpatterns = [
     path('models/', ModelsListAPIView.as_view(), name='models-list'),
     path('demo/', DemoView.as_view(), name='demo'),
 ]
+

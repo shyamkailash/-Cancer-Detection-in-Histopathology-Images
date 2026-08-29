@@ -179,3 +179,4 @@ def get_inference_pipeline() -> InferencePipeline:
     if _GLOBAL_INFERENCE_PIPELINE is None:
         _GLOBAL_INFERENCE_PIPELINE = InferencePipeline()
     return _GLOBAL_INFERENCE_PIPELINE
+

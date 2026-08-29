@@ -158,3 +158,4 @@ def get_model_manager() -> ModelManager:
     if _GLOBAL_MODEL_MANAGER is None:
         _GLOBAL_MODEL_MANAGER = ModelManager()
     return _GLOBAL_MODEL_MANAGER
+
