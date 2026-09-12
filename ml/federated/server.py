@@ -3,6 +3,7 @@ Federated Server Coordinator for multi-site federated learning.
 Manages global rounds, client selection, aggregation (FedAvg/FedBN), global validation, and testing.
 """
 
+import json
 import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Callable
@@ -36,7 +37,7 @@ class FederatedServer:
         client_fraction: float = 1.0,
         algorithm: str = "fedavg",
         seed: int = 42,
-        checkpoint_dir: str = "artifacts/federated",
+        checkpoint_dir: str = "artifacts/federated/fedavg",
     ):
         self.clients = clients
         self.val_loader = val_loader
@@ -64,7 +65,6 @@ class FederatedServer:
             return self.clients
 
         num_select = max(1, int(round(num_total * self.client_fraction)))
-        # Deterministic per-round RNG
         round_rng = np.random.default_rng(self.seed + round_num)
         selected_indices = round_rng.choice(num_total, size=num_select, replace=False)
         return [self.clients[i] for i in selected_indices]
@@ -81,10 +81,16 @@ class FederatedServer:
     def fit(self, rounds: int = 5) -> Dict[str, Any]:
         """
         Execute federated training rounds.
+        Monitors global validation set after each round.
+        Selects best model checkpoint based on validation ROC-AUC / Accuracy.
+        Performs single final evaluation on global held-out test set.
         """
         history: List[Dict[str, Any]] = []
+        best_val_auc = -1.0
         best_val_acc = 0.0
+        best_val_metrics = None
         best_round = 0
+        best_state_dict = None
         start_time = time.time()
 
         model_size_mb = estimate_model_size_mb(self.global_model)
@@ -93,6 +99,17 @@ class FederatedServer:
         print(f"Starting Federated Learning Training ({self.algorithm.upper()})")
         print(f"Rounds: {rounds} | Total Sites: {len(self.clients)} | Fraction: {self.client_fraction}")
         print("=" * 65)
+
+        # Evaluate initial baseline model state before training
+        print("\n--- Initial Validation Before Federated Training ---")
+        init_val = evaluate_model(self.global_model, self.val_loader, criterion=self.criterion, device=self.device)
+        init_auc = init_val.get("roc_auc") or 0.0
+        print(f"Initial Val Loss: {init_val['loss']:.4f} | Val Acc: {init_val['accuracy'] * 100:.2f}% | Sensitivity: {init_val['sensitivity'] * 100:.2f}% | ROC-AUC: {init_auc:.4f}")
+
+        best_val_auc = init_auc
+        best_val_acc = init_val["accuracy"]
+        best_val_metrics = init_val
+        best_state_dict = {k: v.cpu().clone() for k, v in self.global_model.state_dict().items()}
 
         for r in range(1, rounds + 1):
             round_start = time.time()
@@ -122,6 +139,8 @@ class FederatedServer:
                     "train_accuracy": res["train_accuracy"],
                 })
                 print(f"    Samples: {res['num_samples']} | Loss: {res['train_loss']:.4f} | Acc: {res['train_accuracy'] * 100:.2f}%")
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
             # Perform aggregation
             print(f"\nAggregating {len(client_updates)} client updates using {self.algorithm.upper()}...")
@@ -137,12 +156,16 @@ class FederatedServer:
                 criterion=self.criterion,
                 device=self.device,
             )
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
             round_duration = time.time() - round_start
-            print(f"Global Validation Loss:     {val_metrics['loss']:.4f}")
-            print(f"Global Validation Accuracy: {val_metrics['accuracy'] * 100:.2f}%")
+            val_auc = val_metrics.get("roc_auc") or 0.0
+            print(f"Global Validation Loss:        {val_metrics['loss']:.4f}")
+            print(f"Global Validation Accuracy:    {val_metrics['accuracy'] * 100:.2f}%")
             print(f"Global Validation Sensitivity: {val_metrics['sensitivity'] * 100:.2f}%")
             print(f"Global Validation Specificity: {val_metrics['specificity'] * 100:.2f}%")
+            print(f"Global Validation ROC-AUC:     {val_auc:.4f}")
             print(f"Round Duration: {round_duration:.2f}s")
 
             round_record = {
@@ -154,21 +177,29 @@ class FederatedServer:
             }
             history.append(round_record)
 
-            # Checkpoint best model
-            if val_metrics["accuracy"] > best_val_acc:
+            # Validation-only model selection rule (primary: ROC-AUC, secondary: accuracy)
+            is_better = False
+            if val_auc > best_val_auc + 1e-4:
+                is_better = True
+            elif abs(val_auc - best_val_auc) <= 1e-4 and val_metrics["accuracy"] > best_val_acc:
+                is_better = True
+
+            if is_better or r == 1:
+                best_val_auc = val_auc
                 best_val_acc = val_metrics["accuracy"]
+                best_val_metrics = val_metrics
                 best_round = r
+                best_state_dict = {k: v.cpu().clone() for k, v in self.global_model.state_dict().items()}
+                best_payload = {
+                    "round": r,
+                    "algorithm": self.algorithm,
+                    "model_state_dict": best_state_dict,
+                    "val_metrics": val_metrics,
+                }
                 best_path = self.checkpoint_dir / "best_global_model.pt"
-                torch.save(
-                    {
-                        "round": r,
-                        "algorithm": self.algorithm,
-                        "model_state_dict": self.global_model.state_dict(),
-                        "val_metrics": val_metrics,
-                    },
-                    best_path,
-                )
-                print(f"[SAVED] New best global model: {best_path}")
+                torch.save(best_payload, best_path)
+                torch.save(best_payload, self.checkpoint_dir / "best_model.pt")
+                print(f"[*] New best global model at Round {r}: {best_path}")
 
         total_training_time = time.time() - start_time
 
@@ -185,10 +216,14 @@ class FederatedServer:
         )
         print(f"[SAVED] Final global model: {final_path}")
 
+        # Load best selected model for test evaluation
+        if best_state_dict is not None:
+            self.global_model.load_state_dict(best_state_dict)
+
         # Final Global Evaluation on untouched test set
-        print("\n" + "=" * 60)
-        print(f"Evaluating Final {self.algorithm.upper()} Model on Test Set")
-        print("=" * 60)
+        print("\n" + "=" * 65)
+        print(f"Evaluating Best {self.algorithm.upper()} Model (Round {best_round}) on Test Set")
+        print("=" * 65)
 
         test_metrics = evaluate_model(
             self.global_model,
@@ -203,7 +238,7 @@ class FederatedServer:
         print(f"Global Test Specificity: {test_metrics['specificity'] * 100:.2f}% (Normal Tissue)")
         print(f"Global Test Precision:   {test_metrics['precision'] * 100:.2f}%")
         print(f"Global Test F1-Score:    {test_metrics['f1_score'] * 100:.2f}%")
-        if test_metrics["roc_auc"] is not None:
+        if test_metrics.get("roc_auc") is not None:
             print(f"Global Test ROC-AUC:     {test_metrics['roc_auc']:.4f}")
         print(f"Total Training Time:     {total_training_time:.2f}s")
 
@@ -214,13 +249,27 @@ class FederatedServer:
             model_size_mb=model_size_mb,
         )
 
+        # Save test metrics and confusion matrix in algorithm output directory
+        with open(self.checkpoint_dir / "test_metrics.json", "w", encoding="utf-8") as f:
+            json.dump(test_metrics, f, indent=2)
+
+        if "confusion_matrix" in test_metrics:
+            with open(self.checkpoint_dir / "confusion_matrix.json", "w", encoding="utf-8") as f:
+                json.dump(test_metrics["confusion_matrix"], f, indent=2)
+
+        with open(self.checkpoint_dir / "round_metrics.json", "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=2)
+
         return {
             "algorithm": self.algorithm,
             "rounds": rounds,
             "best_round": best_round,
             "best_val_accuracy": best_val_acc,
+            "best_val_metrics": best_val_metrics,
+            "init_val_metrics": init_val,
             "history": history,
             "test_metrics": test_metrics,
             "total_training_time": total_training_time,
             "communication_stats": comm_stats,
+            "best_checkpoint": str(self.checkpoint_dir / "best_model.pt"),
         }

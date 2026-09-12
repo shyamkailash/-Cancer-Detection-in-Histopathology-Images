@@ -1,0 +1,42 @@
+# =============================================================================
+# Federated Learning Benchmark Configuration
+# Semester Project: Privacy-Preserving Federated Learning for Multi-Site Cancer Detection
+# =============================================================================
+
+experiment:
+  name: "federated_cancer_detection_pcam"
+  description: "Controlled Multi-Site Federated Learning Benchmark on PCam Histopathology"
+  seed: 42
+  num_clients: 5
+  client_fraction: 1.0
+  rounds: 3
+  subset_fraction: 0.20
+  local_epochs: 1
+  batch_size: 64
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+  partition_type: "noniid"
+  dirichlet_alpha: 0.5
+  dataset_manifest: "data/metadata/manifests/pcam_manifest.jsonl"
+  baseline_checkpoint: "artifacts/checkpoints/pcam_resnet18_best.pt"
+  finetuned_checkpoint: "artifacts/finetuning/centralized/best_model.pt"
+  output_base_dir: "artifacts/federated"
+
+algorithms:
+  fedavg:
+    description: "Federated Averaging (McMahan et al., AISTATS 2017)"
+    privacy: "none"
+  fedprox:
+    description: "Federated Optimization with Proximal Regularization (Li et al., MLSys 2020)"
+    mu: 0.01
+    privacy: "none"
+  fedbn:
+    description: "Federated Learning with Local Batch Normalization (Li et al., ICLR 2021)"
+    privacy: "none"
+  dp_fedavg:
+    description: "Differentially Private Federated Averaging (Gaussian Mechanism with Gradient Clipping)"
+    privacy: "dp"
+    max_grad_norm: 1.0
+    noise_multiplier: 1.0
+    delta: 1.0e-5
+

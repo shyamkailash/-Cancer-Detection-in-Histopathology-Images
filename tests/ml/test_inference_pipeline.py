@@ -2,6 +2,7 @@
 Tests for ML Inference Pipeline and Grad-CAM Visual Explainability.
 """
 
+from pathlib import Path
 from PIL import Image
 import numpy as np
 import torch
@@ -34,6 +35,51 @@ def test_model_manager_list_and_canonicalize():
     assert manager.canonicalize_model_name("proximal") == "fedprox"
     assert manager.canonicalize_model_name("batchnorm") == "fedbn"
     assert manager.canonicalize_model_name("privacy_federated") == "dp_fedavg"
+
+
+def test_centralized_default_resolves_to_baseline_checkpoint():
+    manager = ModelManager(device=torch.device("cpu"))
+
+    checkpoint = manager.resolve_checkpoint_path("centralized")
+
+    assert checkpoint == Path(MODEL_REGISTRY_CONFIG["centralized"]["default_checkpoint"])
+
+
+def test_custom_structured_checkpoint_loads(tmp_path):
+    checkpoint_path = tmp_path / "candidate.pt"
+    source_model = create_resnet18(num_classes=2, pretrained=False)
+    torch.save({"epoch": 3, "model_state_dict": source_model.state_dict()}, checkpoint_path)
+    manager = ModelManager(device=torch.device("cpu"))
+
+    model = manager.get_model("centralized", checkpoint_path=str(checkpoint_path))
+
+    assert model.training is False
+
+
+def test_invalid_checkpoint_path_has_clear_error(tmp_path):
+    manager = ModelManager(device=torch.device("cpu"))
+    missing_path = tmp_path / "missing.pt"
+
+    try:
+        manager.get_model("centralized", checkpoint_path=str(missing_path))
+    except FileNotFoundError as exc:
+        assert "Checkpoint file not found" in str(exc)
+    else:
+        raise AssertionError("Expected a missing checkpoint error")
+
+
+def test_incompatible_checkpoint_has_clear_error(tmp_path):
+    checkpoint_path = tmp_path / "incompatible.pt"
+    incompatible_model = create_resnet18(num_classes=3, pretrained=False)
+    torch.save({"model_state_dict": incompatible_model.state_dict()}, checkpoint_path)
+    manager = ModelManager(device=torch.device("cpu"))
+
+    try:
+        manager.get_model("centralized", checkpoint_path=str(checkpoint_path))
+    except ValueError as exc:
+        assert "incompatible with the expected ResNet-18 architecture" in str(exc)
+    else:
+        raise AssertionError("Expected an incompatible checkpoint error")
 
 
 def test_gradcam_generation():

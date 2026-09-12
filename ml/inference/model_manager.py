@@ -141,39 +141,77 @@ class ModelManager:
         cfg["device"] = str(self.device)
         return cfg
 
-    def get_model(self, model_name: str = "centralized") -> nn.Module:
+    def get_model(
+        self,
+        model_name: str = "centralized",
+        checkpoint_path: Optional[str] = None,
+    ) -> nn.Module:
         """
         Get or load the requested model. Caches loaded models in memory.
         """
         canonical = self.canonicalize_model_name(model_name)
 
-        if canonical in self._models:
-            return self._models[canonical]
-
         cfg = MODEL_REGISTRY_CONFIG[canonical]
-        ckpt_path = Path(cfg["default_checkpoint"])
+        ckpt_path = Path(checkpoint_path) if checkpoint_path else Path(cfg["default_checkpoint"])
 
-        if not ckpt_path.exists() and "fallback_checkpoint" in cfg:
+        if checkpoint_path and not ckpt_path.exists():
+            raise FileNotFoundError(f"Checkpoint file not found: {ckpt_path.resolve()}")
+
+        if not checkpoint_path and not ckpt_path.exists() and "fallback_checkpoint" in cfg:
             fallback = Path(cfg["fallback_checkpoint"])
             if fallback.exists():
                 ckpt_path = fallback
+
+        cache_key = f"{canonical}:{ckpt_path.resolve()}"
+        if cache_key in self._models:
+            return self._models[cache_key]
 
         # Initialize ResNet-18
         model = create_resnet18(num_classes=2, pretrained=True).to(self.device)
 
         if ckpt_path.exists():
             checkpoint = torch.load(str(ckpt_path), map_location=self.device, weights_only=False)
-            if "model_state_dict" in checkpoint:
-                model.load_state_dict(checkpoint["model_state_dict"], strict=False)
-            elif isinstance(checkpoint, dict):
-                model.load_state_dict(checkpoint, strict=False)
+            state_dict = checkpoint.get("model_state_dict") if isinstance(checkpoint, dict) else None
+            if state_dict is None and isinstance(checkpoint, dict):
+                state_dict = checkpoint
+            if not isinstance(state_dict, dict):
+                raise ValueError(
+                    f"Checkpoint '{ckpt_path}' does not contain a valid model_state_dict"
+                )
+            try:
+                model.load_state_dict(state_dict, strict=True)
+            except RuntimeError as exc:
+                raise ValueError(
+                    f"Checkpoint '{ckpt_path}' is incompatible with the expected ResNet-18 architecture: {exc}"
+                ) from exc
         else:
             # Fallback to pretrained weights if checkpoint file is not yet generated
             pass
 
         model.eval()
-        self._models[canonical] = model
+        self._models[cache_key] = model
         return model
+
+    def resolve_checkpoint_path(
+        self,
+        model_name: str = "centralized",
+        checkpoint_path: Optional[str] = None,
+    ) -> Path:
+        """Resolve the checkpoint selected for a model without loading it."""
+        canonical = self.canonicalize_model_name(model_name)
+        if checkpoint_path:
+            path = Path(checkpoint_path)
+            if not path.exists():
+                raise FileNotFoundError(f"Checkpoint file not found: {path.resolve()}")
+            return path
+
+        config = MODEL_REGISTRY_CONFIG[canonical]
+        path = Path(config["default_checkpoint"])
+        if not path.exists() and config.get("fallback_checkpoint"):
+            fallback = Path(config["fallback_checkpoint"])
+            if fallback.exists():
+                return fallback
+        return path
 
     def preload_all(self):
         """Preload all configured models into memory."""

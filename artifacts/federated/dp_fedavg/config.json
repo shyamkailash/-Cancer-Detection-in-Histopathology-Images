@@ -1,0 +1,29 @@
+{
+  "algorithm": "dp_fedavg",
+  "seed": 42,
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce RTX 3050 6GB Laptop GPU",
+  "num_clients": 5,
+  "client_fraction": 1.0,
+  "partition_strategy": "noniid",
+  "dirichlet_alpha": 0.5,
+  "rounds": 3,
+  "local_epochs": 1,
+  "batch_size": 64,
+  "learning_rate": 0.0001,
+  "weight_decay": 0.0001,
+  "mu": null,
+  "privacy": {
+    "enabled": true,
+    "max_grad_norm": 1.0,
+    "noise_multiplier": 1.0,
+    "mechanism": "Gaussian DP Prototype (Gradient Clipping + Gaussian Noise)",
+    "delta": 1e-05,
+    "formal_epsilon_status": "Formal epsilon accounting not implemented/verified (empirical gradient clipping and calibrated Gaussian perturbation applied)"
+  },
+  "subset_fraction": 0.2,
+  "total_training_samples": 30804,
+  "validation_samples": 33004,
+  "test_samples": 33003,
+  "baseline_checkpoint": "/home/shyamkailash-s/Desktop/SEMESTER/Cancer-Detection-Histopathology/artifacts/checkpoints/pcam_resnet18_best.pt"
+}

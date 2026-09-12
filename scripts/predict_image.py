@@ -39,6 +39,12 @@ def parse_args():
         help="Directory to save original, heatmap, and overlay images (default: artifacts/predictions).",
     )
     parser.add_argument(
+        "--checkpoint",
+        type=str,
+        default=None,
+        help="Optional checkpoint path override; the model default is used when omitted.",
+    )
+    parser.add_argument(
         "--no-gradcam",
         action="store_true",
         help="Disable Grad-CAM heatmap generation.",
@@ -68,6 +74,7 @@ def main():
     print("=" * 65)
     print(f"Input Image:   {image_path.resolve()}")
     print(f"Model:         {args.model}")
+    print(f"Checkpoint:    {Path(args.checkpoint).resolve() if args.checkpoint else 'model default'}")
     print(f"Grad-CAM:      {'Disabled' if args.no_gradcam else 'Enabled'}")
 
     result = pipeline.predict(
@@ -75,6 +82,7 @@ def main():
         model_name=args.model,
         include_gradcam=not args.no_gradcam,
         target_class=args.target_class,
+        checkpoint_path=args.checkpoint,
     )
 
     pred = result["prediction"]

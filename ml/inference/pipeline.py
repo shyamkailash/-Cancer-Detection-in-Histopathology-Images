@@ -62,6 +62,7 @@ class InferencePipeline:
         include_gradcam: bool = True,
         target_class: Optional[int] = None,
         heatmap_alpha: float = 0.5,
+        checkpoint_path: Optional[Union[str, Path]] = None,
     ) -> Dict[str, Any]:
         """
         Run cancer detection prediction and optional Grad-CAM explainability.
@@ -92,7 +93,9 @@ class InferencePipeline:
             raise RuntimeError(f"Unexpected transform output type: {type(transformed_np)}")
 
         # 3. Retrieve model and execute forward pass
-        model = self.model_manager.get_model(model_name)
+        checkpoint = self.model_manager.resolve_checkpoint_path(model_name, checkpoint_path)
+        selected_checkpoint = str(checkpoint) if checkpoint.exists() else checkpoint_path
+        model = self.model_manager.get_model(model_name, checkpoint_path=selected_checkpoint)
         device = next(model.parameters()).device
         input_tensor = input_tensor.to(device)
 
@@ -157,6 +160,7 @@ class InferencePipeline:
                 "display_name": model_info["display_name"],
                 "paradigm": model_info["paradigm"],
                 "device": str(device),
+                "checkpoint_path": str(checkpoint.resolve()),
             },
             "image_metadata": {
                 "original_width": orig_width,

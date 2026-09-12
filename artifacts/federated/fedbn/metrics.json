@@ -1,0 +1,257 @@
+{
+  "algorithm": "fedbn",
+  "best_round": 1,
+  "best_val_accuracy": 0.9183432311235001,
+  "best_val_metrics": {
+    "accuracy": 0.9183432311235001,
+    "sensitivity": 0.8203919808497906,
+    "specificity": 0.9850275005092687,
+    "precision": 0.9738921942989077,
+    "f1_score": 0.8905761500669942,
+    "roc_auc": 0.979032675057074,
+    "confusion_matrix": {
+      "tn": 19342,
+      "fp": 294,
+      "fn": 2401,
+      "tp": 10967
+    },
+    "total_samples": 33004,
+    "loss": 0.23551128743009384
+  },
+  "init_val_metrics": {
+    "accuracy": 0.9427039146770089,
+    "sensitivity": 0.8980400957510473,
+    "specificity": 0.973110613159503,
+    "precision": 0.9578712199792547,
+    "f1_score": 0.9269912358596193,
+    "roc_auc": 0.9825014927576567,
+    "confusion_matrix": {
+      "tn": 19108,
+      "fp": 528,
+      "fn": 1363,
+      "tp": 12005
+    },
+    "total_samples": 33004,
+    "loss": 0.1600598776140743
+  },
+  "total_training_time_seconds": 216.89389729499817,
+  "communication_stats": {
+    "model_size_mb": 42.68,
+    "rounds": 3,
+    "clients_per_round": 5,
+    "per_round_mb": 426.76,
+    "total_communication_mb": 1280.27,
+    "total_communication_gb": 1.25,
+    "note": "Estimated bidirectional network payload (float32 parameter transfers, excluding protocol overhead)."
+  },
+  "test_metrics": {
+    "accuracy": 0.9177044511105051,
+    "sensitivity": 0.8217999551133388,
+    "specificity": 0.9829904257486249,
+    "precision": 0.9704920929410725,
+    "f1_score": 0.88997812525318,
+    "roc_auc": 0.9796354682375668,
+    "confusion_matrix": {
+      "tn": 19302,
+      "fp": 334,
+      "fn": 2382,
+      "tp": 10985
+    },
+    "total_samples": 33003,
+    "loss": 0.2332342649350521
+  },
+  "history": [
+    {
+      "round": 1,
+      "duration_seconds": 61.39448523521423,
+      "participating_clients": [
+        "site_1",
+        "site_2",
+        "site_3",
+        "site_4",
+        "site_5"
+      ],
+      "client_metrics": [
+        {
+          "client_id": "site_1",
+          "site_name": "Hospital A (Simulated Site)",
+          "num_samples": 11203,
+          "train_loss": 0.147754261592217,
+          "train_accuracy": 0.9438543247344461
+        },
+        {
+          "client_id": "site_2",
+          "site_name": "Hospital B (Simulated Site)",
+          "num_samples": 13243,
+          "train_loss": 0.13848118239849577,
+          "train_accuracy": 0.9506909310579174
+        },
+        {
+          "client_id": "site_3",
+          "site_name": "Hospital C (Simulated Site)",
+          "num_samples": 310,
+          "train_loss": 0.10656194153331941,
+          "train_accuracy": 0.9580645161290322
+        },
+        {
+          "client_id": "site_4",
+          "site_name": "Hospital D (Simulated Site)",
+          "num_samples": 4240,
+          "train_loss": 0.19881979750012452,
+          "train_accuracy": 0.9337264150943396
+        },
+        {
+          "client_id": "site_5",
+          "site_name": "Hospital E (Simulated Site)",
+          "num_samples": 1808,
+          "train_loss": 0.3275750754153834,
+          "train_accuracy": 0.9137168141592921
+        }
+      ],
+      "global_val_metrics": {
+        "accuracy": 0.9183432311235001,
+        "sensitivity": 0.8203919808497906,
+        "specificity": 0.9850275005092687,
+        "precision": 0.9738921942989077,
+        "f1_score": 0.8905761500669942,
+        "roc_auc": 0.979032675057074,
+        "confusion_matrix": {
+          "tn": 19342,
+          "fp": 294,
+          "fn": 2401,
+          "tp": 10967
+        },
+        "total_samples": 33004,
+        "loss": 0.23551128743009384
+      }
+    },
+    {
+      "round": 2,
+      "duration_seconds": 64.15254306793213,
+      "participating_clients": [
+        "site_1",
+        "site_2",
+        "site_3",
+        "site_4",
+        "site_5"
+      ],
+      "client_metrics": [
+        {
+          "client_id": "site_1",
+          "site_name": "Hospital A (Simulated Site)",
+          "num_samples": 11203,
+          "train_loss": 0.14432722114616447,
+          "train_accuracy": 0.9464429170757833
+        },
+        {
+          "client_id": "site_2",
+          "site_name": "Hospital B (Simulated Site)",
+          "num_samples": 13243,
+          "train_loss": 0.13003954388505606,
+          "train_accuracy": 0.9549950917465831
+        },
+        {
+          "client_id": "site_3",
+          "site_name": "Hospital C (Simulated Site)",
+          "num_samples": 310,
+          "train_loss": 0.096609632238265,
+          "train_accuracy": 0.964516129032258
+        },
+        {
+          "client_id": "site_4",
+          "site_name": "Hospital D (Simulated Site)",
+          "num_samples": 4240,
+          "train_loss": 0.18704436854371484,
+          "train_accuracy": 0.9389150943396226
+        },
+        {
+          "client_id": "site_5",
+          "site_name": "Hospital E (Simulated Site)",
+          "num_samples": 1808,
+          "train_loss": 0.359344202332792,
+          "train_accuracy": 0.9087389380530974
+        }
+      ],
+      "global_val_metrics": {
+        "accuracy": 0.8548357774815174,
+        "sensitivity": 0.6525284260921603,
+        "specificity": 0.9925646771236505,
+        "precision": 0.9835381666478746,
+        "f1_score": 0.7845482753968611,
+        "roc_auc": 0.9736694220205709,
+        "confusion_matrix": {
+          "tn": 19490,
+          "fp": 146,
+          "fn": 4645,
+          "tp": 8723
+        },
+        "total_samples": 33004,
+        "loss": 0.4295745193555887
+      }
+    },
+    {
+      "round": 3,
+      "duration_seconds": 64.44865584373474,
+      "participating_clients": [
+        "site_1",
+        "site_2",
+        "site_3",
+        "site_4",
+        "site_5"
+      ],
+      "client_metrics": [
+        {
+          "client_id": "site_1",
+          "site_name": "Hospital A (Simulated Site)",
+          "num_samples": 11203,
+          "train_loss": 0.1305408393401371,
+          "train_accuracy": 0.9533160760510577
+        },
+        {
+          "client_id": "site_2",
+          "site_name": "Hospital B (Simulated Site)",
+          "num_samples": 13243,
+          "train_loss": 0.12035172308437829,
+          "train_accuracy": 0.9578645322056936
+        },
+        {
+          "client_id": "site_3",
+          "site_name": "Hospital C (Simulated Site)",
+          "num_samples": 310,
+          "train_loss": 0.08479670262144458,
+          "train_accuracy": 0.9580645161290322
+        },
+        {
+          "client_id": "site_4",
+          "site_name": "Hospital D (Simulated Site)",
+          "num_samples": 4240,
+          "train_loss": 0.18399691418656763,
+          "train_accuracy": 0.9375
+        },
+        {
+          "client_id": "site_5",
+          "site_name": "Hospital E (Simulated Site)",
+          "num_samples": 1808,
+          "train_loss": 0.33733663615663495,
+          "train_accuracy": 0.9148230088495575
+        }
+      ],
+      "global_val_metrics": {
+        "accuracy": 0.813174160707793,
+        "sensitivity": 0.5444344703770198,
+        "specificity": 0.996129557954777,
+        "precision": 0.9896654881697036,
+        "f1_score": 0.7024418492423511,
+        "roc_auc": 0.9730492727210333,
+        "confusion_matrix": {
+          "tn": 19560,
+          "fp": 76,
+          "fn": 6090,
+          "tp": 7278
+        },
+        "total_samples": 33004,
+        "loss": 0.7015841657256825
+      }
+    }
+  ]
+}
