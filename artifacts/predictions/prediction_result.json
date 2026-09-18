@@ -1,20 +1,21 @@
 {
   "status": "success",
   "prediction": {
-    "class_id": 0,
-    "class_name": "normal",
-    "description": "Normal Lymph Node Tissue (No Tumor Detected)",
-    "confidence": 0.867,
+    "class_id": 1,
+    "class_name": "metastasis",
+    "description": "Metastatic Tumor Tissue (Malignant Cells Detected)",
+    "confidence": 0.9827,
     "probabilities": {
-      "normal": 0.867,
-      "metastasis": 0.133
+      "normal": 0.0173,
+      "metastasis": 0.9827
     }
   },
   "model": {
-    "id": "dp_fedavg",
-    "display_name": "Privacy-Preserving Federated ResNet-18 (DP-FedAvg)",
-    "paradigm": "Privacy-Preserving Federated Learning",
-    "device": "cuda:0"
+    "id": "fedavg",
+    "display_name": "Federated ResNet-18 (FedAvg)",
+    "paradigm": "Federated Learning",
+    "device": "cuda:0",
+    "checkpoint_path": "/home/shyamkailash-s/Desktop/SEMESTER/Cancer-Detection-Histopathology/artifacts/federated/fedavg/best_global_model.pt"
   },
   "image_metadata": {
     "original_width": 96,
@@ -28,10 +29,10 @@
   "explainability": {
     "method": "Grad-CAM",
     "target_layer": "layer4",
-    "explained_class_id": 0,
-    "explained_class_name": "normal",
+    "explained_class_id": 1,
+    "explained_class_name": "metastasis",
     "saved_visuals_dir": "artifacts/predictions"
   },
-  "inference_time_ms": 563.19,
+  "inference_time_ms": 795.56,
   "disclaimer": "Academic & Research Prototype. Not approved for medical diagnosis or clinical use."
 }

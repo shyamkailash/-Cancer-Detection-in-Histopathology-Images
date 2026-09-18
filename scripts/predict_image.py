@@ -29,8 +29,8 @@ def parse_args():
         "--model",
         type=str,
         default="centralized",
-        choices=["centralized", "fedavg", "dp_fedavg"],
-        help="Model architecture: 'centralized', 'fedavg', or 'dp_fedavg' (default: centralized).",
+        choices=["centralized", "centralized_finetuned", "fedavg", "fedprox", "fedbn", "dp_fedavg"],
+        help="Model architecture: 'centralized', 'centralized_finetuned', 'fedavg', 'fedprox', 'fedbn', or 'dp_fedavg' (default: centralized).",
     )
     parser.add_argument(
         "--output-dir",
