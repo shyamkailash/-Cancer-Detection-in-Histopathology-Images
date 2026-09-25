@@ -5,10 +5,13 @@ Supports Centralized, FedAvg, FedProx, FedBN, and DP-FedAvg ResNet-18 variants.
 
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 import torch
 import torch.nn as nn
 
 from ml.models.resnet import create_resnet18
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 MODEL_REGISTRY_CONFIG = {
@@ -113,6 +116,15 @@ class ModelManager:
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self._models: Dict[str, nn.Module] = {}
 
+    def _resolve_path(self, path_like: Optional[Union[str, Path]]) -> Path:
+        """Resolve a path to an absolute path relative to project root if relative."""
+        if not path_like:
+            return Path("")
+        p = Path(path_like)
+        if p.is_absolute():
+            return p
+        return (PROJECT_ROOT / p).resolve()
+
     def canonicalize_model_name(self, model_name: str) -> str:
         """Resolve model alias to canonical identifier."""
         name_clean = str(model_name).lower().strip()
@@ -131,8 +143,22 @@ class ModelManager:
             ckpt_path = Path(cfg["default_checkpoint"])
             fallback_path = Path(cfg.get("fallback_checkpoint", ""))
             has_ckpt = ckpt_path.exists() or (fallback_path.exists() if str(fallback_path) else False)
+            default_str = cfg.get("default_checkpoint", "")
+            fallback_str = cfg.get("fallback_checkpoint", "")
 
             chosen_path = str(ckpt_path) if ckpt_path.exists() else (str(fallback_path) if fallback_path.exists() else "")
+            default_abs = self._resolve_path(default_str)
+            fallback_abs = self._resolve_path(fallback_str)
+
+            if default_str and default_abs.exists():
+                has_ckpt = True
+                chosen_path = default_str
+            elif fallback_str and fallback_abs.exists():
+                has_ckpt = True
+                chosen_path = fallback_str
+            else:
+                has_ckpt = False
+                chosen_path = ""
 
             catalog.append({
                 "id": model_id,
@@ -142,6 +168,7 @@ class ModelManager:
                 "checkpoint_exists": has_ckpt,
                 "checkpoint_path": chosen_path,
                 "is_cached": model_id in self._models,
+                "is_cached": any(k.startswith(f"{model_id}:") for k in self._models),
                 "benchmark_accuracy": cfg.get("benchmark_accuracy"),
                 "benchmark_sensitivity": cfg.get("benchmark_sensitivity"),
                 "benchmark_roc_auc": cfg.get("benchmark_roc_auc"),
@@ -171,13 +198,23 @@ class ModelManager:
 
         if checkpoint_path and not ckpt_path.exists():
             raise FileNotFoundError(f"Checkpoint file not found: {ckpt_path.resolve()}")
+        target_path_str = checkpoint_path or cfg.get("default_checkpoint", "")
+        abs_path = self._resolve_path(target_path_str)
 
         if not checkpoint_path and not ckpt_path.exists() and "fallback_checkpoint" in cfg:
             fallback = Path(cfg["fallback_checkpoint"])
             if fallback.exists():
                 ckpt_path = fallback
+        if checkpoint_path and not abs_path.exists():
+            raise FileNotFoundError(f"Checkpoint file not found: {abs_path}")
 
         cache_key = f"{canonical}:{ckpt_path.resolve()}"
+        if not checkpoint_path and not abs_path.exists() and "fallback_checkpoint" in cfg:
+            fallback_abs = self._resolve_path(cfg["fallback_checkpoint"])
+            if fallback_abs.exists():
+                abs_path = fallback_abs
+
+        cache_key = f"{canonical}:{abs_path}"
         if cache_key in self._models:
             return self._models[cache_key]
 
@@ -186,18 +223,22 @@ class ModelManager:
 
         if ckpt_path.exists():
             checkpoint = torch.load(str(ckpt_path), map_location=self.device, weights_only=False)
+        if abs_path.exists() and abs_path.is_file():
+            checkpoint = torch.load(str(abs_path), map_location=self.device, weights_only=False)
             state_dict = checkpoint.get("model_state_dict") if isinstance(checkpoint, dict) else None
             if state_dict is None and isinstance(checkpoint, dict):
                 state_dict = checkpoint
             if not isinstance(state_dict, dict):
                 raise ValueError(
                     f"Checkpoint '{ckpt_path}' does not contain a valid model_state_dict"
+                    f"Checkpoint '{abs_path}' does not contain a valid model_state_dict"
                 )
             try:
                 model.load_state_dict(state_dict, strict=True)
             except RuntimeError as exc:
                 raise ValueError(
                     f"Checkpoint '{ckpt_path}' is incompatible with the expected ResNet-18 architecture: {exc}"
+                    f"Checkpoint '{abs_path}' is incompatible with the expected ResNet-18 architecture: {exc}"
                 ) from exc
         else:
             # Fallback to pretrained weights if checkpoint file is not yet generated
@@ -218,6 +259,9 @@ class ModelManager:
             path = Path(checkpoint_path)
             if not path.exists():
                 raise FileNotFoundError(f"Checkpoint file not found: {path.resolve()}")
+            abs_path = self._resolve_path(path)
+            if not abs_path.exists():
+                raise FileNotFoundError(f"Checkpoint file not found: {abs_path}")
             return path
 
         config = MODEL_REGISTRY_CONFIG[canonical]
@@ -227,6 +271,14 @@ class ModelManager:
             if fallback.exists():
                 return fallback
         return path
+        default_path = Path(config["default_checkpoint"])
+        if self._resolve_path(default_path).exists():
+            return default_path
+        if config.get("fallback_checkpoint"):
+            fallback_path = Path(config["fallback_checkpoint"])
+            if self._resolve_path(fallback_path).exists():
+                return fallback_path
+        return default_path
 
     def preload_all(self):
         """Preload all configured models into memory."""

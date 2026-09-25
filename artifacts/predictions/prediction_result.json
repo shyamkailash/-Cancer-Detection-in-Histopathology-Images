@@ -33,6 +33,6 @@
     "explained_class_name": "metastasis",
     "saved_visuals_dir": "artifacts/predictions"
   },
-  "inference_time_ms": 795.56,
+  "inference_time_ms": 742.35,
   "disclaimer": "Academic & Research Prototype. Not approved for medical diagnosis or clinical use."
 }
