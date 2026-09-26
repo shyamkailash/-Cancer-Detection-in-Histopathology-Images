@@ -1,0 +1,42 @@
+{
+  "plan_id": "plan_35bce94b",
+  "created_at": 1790350610.906888,
+  "trigger_reason": "Confirmed distribution drift / metric degradation with sufficient telemetry buffer.",
+  "trigger_metric": true,
+  "current_model": "centralized",
+  "target_model_name": "centralized_retrained_plan_35bce94b",
+  "recommended_strategy": "fedprox",
+  "training_parameters": {
+    "strategy": "fedprox",
+    "rounds": 3,
+    "epochs": 1,
+    "batch_size": 64,
+    "clients": [
+      "site_0",
+      "site_1",
+      "site_2",
+      "site_3",
+      "site_4"
+    ],
+    "privacy_enabled": false,
+    "max_grad_norm": null,
+    "noise_multiplier": null
+  },
+  "evaluation_requirements": {
+    "min_accuracy": 0.9,
+    "min_roc_auc": 0.9,
+    "min_sensitivity": 0.8,
+    "target_dataset": "PCam Global Test Set (33,003 samples)"
+  },
+  "execution_mode": "PLANNED_ONLY",
+  "approval_required": true,
+  "approved_by": null,
+  "safety_checks": {
+    "safe_dry_run_default": true,
+    "no_automatic_production_overwrite": true,
+    "quality_gate_enforced": true,
+    "sample_buffer_sufficient": true
+  },
+  "event_id": "plan_35bce94b",
+  "timestamp": 1790350610.906888
+}

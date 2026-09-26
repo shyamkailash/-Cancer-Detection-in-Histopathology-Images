@@ -1,0 +1,489 @@
+{
+  "run_id": "mlops_run_1790350463530_8b99c9",
+  "created_at": 1790350463.530457,
+  "status": "DRY_RUN_COMPLETED",
+  "stages": [
+    {
+      "stage_number": 1,
+      "stage_name": "Config Initialization",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5304623,
+      "details": {
+        "config": {
+          "mlflow": {
+            "enabled": false,
+            "tracking_uri": "artifacts/mlflow",
+            "experiment_name": "pcam_cancer_detection"
+          },
+          "drift": {
+            "method": "psi",
+            "threshold": 0.1,
+            "warning_threshold": 0.1,
+            "critical_threshold": 0.25,
+            "min_samples": 50
+          },
+          "registry": {
+            "min_accuracy": 0.9,
+            "min_roc_auc": 0.9,
+            "min_sensitivity": 0.8,
+            "require_checkpoint_exists": true
+          },
+          "privacy": {
+            "enabled": false,
+            "strategy": "none",
+            "clipping_norm": 1.0,
+            "noise_multiplier": 1.0,
+            "delta": 1e-05,
+            "accountant": "rdp"
+          },
+          "retraining": {
+            "enabled": true,
+            "dry_run": true,
+            "min_samples_since_retrain": 500,
+            "cooldown_seconds": 3600
+          },
+          "orchestrator": {
+            "dry_run": true,
+            "max_retries": 3,
+            "timeout_seconds": 300
+          }
+        },
+        "dry_run": true
+      }
+    },
+    {
+      "stage_number": 2,
+      "stage_name": "Tracking Initialization",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5304716,
+      "details": {
+        "tracker_available": false,
+        "tracking_run_id": "run_1790350463530"
+      }
+    },
+    {
+      "stage_number": 3,
+      "stage_name": "Distributed Node Health Check",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.530478,
+      "details": {
+        "total_nodes": 5,
+        "node_statuses": {
+          "site_0": "HEALTHY",
+          "site_1": "HEALTHY",
+          "site_2": "HEALTHY",
+          "site_3": "HEALTHY",
+          "site_4": "HEALTHY"
+        }
+      }
+    },
+    {
+      "stage_number": 4,
+      "stage_name": "Client Selection",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5305443,
+      "details": {
+        "agent_name": "ClientSelectionAgent",
+        "status": "SUCCESS",
+        "decision": "CLIENTS_SELECTED",
+        "details": {
+          "strategy": "fedavg",
+          "selected_client_ids": [
+            "site_0",
+            "site_1",
+            "site_2",
+            "site_3",
+            "site_4"
+          ],
+          "client_count": 5,
+          "total_samples": 30804,
+          "client_metadata": {
+            "site_0": {
+              "node_id": "site_0",
+              "display_name": "Simulated Hospital Alpha (Pathology)",
+              "status": "HEALTHY",
+              "endpoint": "ipc://hospital_site_0.sock",
+              "sample_count": 6161,
+              "dataset_name": "PCam Partition",
+              "hardware": "GPU/CUDA",
+              "last_heartbeat": 1790350463.5299916,
+              "metadata": {}
+            },
+            "site_1": {
+              "node_id": "site_1",
+              "display_name": "Simulated Hospital Beta (Oncology)",
+              "status": "HEALTHY",
+              "endpoint": "ipc://hospital_site_1.sock",
+              "sample_count": 6161,
+              "dataset_name": "PCam Partition",
+              "hardware": "GPU/CUDA",
+              "last_heartbeat": 1790350463.5299916,
+              "metadata": {}
+            },
+            "site_2": {
+              "node_id": "site_2",
+              "display_name": "Simulated Hospital Gamma (Diagnostics)",
+              "status": "HEALTHY",
+              "endpoint": "ipc://hospital_site_2.sock",
+              "sample_count": 6161,
+              "dataset_name": "PCam Partition",
+              "hardware": "GPU/CUDA",
+              "last_heartbeat": 1790350463.5299916,
+              "metadata": {}
+            },
+            "site_3": {
+              "node_id": "site_3",
+              "display_name": "Simulated Hospital Delta (Histology)",
+              "status": "HEALTHY",
+              "endpoint": "ipc://hospital_site_3.sock",
+              "sample_count": 6161,
+              "dataset_name": "PCam Partition",
+              "hardware": "GPU/CUDA",
+              "last_heartbeat": 1790350463.5299916,
+              "metadata": {}
+            },
+            "site_4": {
+              "node_id": "site_4",
+              "display_name": "Simulated Hospital Epsilon (Research)",
+              "status": "HEALTHY",
+              "endpoint": "ipc://hospital_site_4.sock",
+              "sample_count": 6160,
+              "dataset_name": "PCam Partition",
+              "hardware": "GPU/CUDA",
+              "last_heartbeat": 1790350463.5299916,
+              "metadata": {}
+            }
+          }
+        },
+        "execution_time_ms": 0.03
+      }
+    },
+    {
+      "stage_number": 5,
+      "stage_name": "Privacy Accounting",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5305562,
+      "details": {
+        "agent_name": "PrivacyAgent",
+        "status": "SUCCESS",
+        "decision": "PRIVACY_DISABLED",
+        "details": {
+          "privacy_enabled": false,
+          "message": "Differential privacy was not enabled for this workflow."
+        },
+        "execution_time_ms": 0.0
+      }
+    },
+    {
+      "stage_number": 6,
+      "stage_name": "Data Manifest Verification",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5305572,
+      "details": {
+        "dataset": "PCam",
+        "verified_splits": {
+          "train": 154018,
+          "val": 33004,
+          "test": 33003
+        },
+        "manifest_status": "VALID"
+      }
+    },
+    {
+      "stage_number": 7,
+      "stage_name": "Model Registry Assessment",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5305622,
+      "details": {
+        "registered_models_count": 6
+      }
+    },
+    {
+      "stage_number": 8,
+      "stage_name": "Drift Monitoring",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5308824,
+      "details": {
+        "agent_name": "DriftAgent",
+        "status": "SUCCESS",
+        "decision": "DRIFT_DETECTED",
+        "details": {
+          "status": "DRIFT",
+          "drift_detected": true,
+          "statistic_value": 0.6987938586559238,
+          "metric_name": "psi",
+          "warning_threshold": 0.1,
+          "critical_threshold": 0.25,
+          "baseline_summary": {
+            "mean": 0.5,
+            "std": 0.4,
+            "count": 2
+          },
+          "current_summary": {
+            "mean": 0.5,
+            "std": 0.05000000000000002,
+            "count": 2
+          },
+          "explanation": "Critical statistical drift detected: Population Stability Index (0.6988) >= critical threshold (0.2500).",
+          "disclaimer": "Prediction distribution drift detector. Academic statistical monitoring, not a clinical diagnostic tool."
+        },
+        "execution_time_ms": 0.3
+      }
+    },
+    {
+      "stage_number": 9,
+      "stage_name": "Retraining Planning",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5315382,
+      "details": {
+        "agent_name": "RetrainingAgent",
+        "status": "SUCCESS",
+        "decision": "RETRAINING_PLANNED",
+        "details": {
+          "retraining_needed": true,
+          "plan": {
+            "plan_id": "plan_2d7c98a8",
+            "created_at": 1790350463.531444,
+            "trigger_reason": "Confirmed distribution drift / metric degradation with sufficient telemetry buffer.",
+            "trigger_metric": true,
+            "current_model": "centralized",
+            "target_model_name": "centralized_retrained_plan_2d7c98a8",
+            "recommended_strategy": "fedavg",
+            "training_parameters": {
+              "strategy": "fedavg",
+              "rounds": 3,
+              "epochs": 1,
+              "batch_size": 64,
+              "clients": [
+                "site_0",
+                "site_1",
+                "site_2",
+                "site_3",
+                "site_4"
+              ],
+              "privacy_enabled": false,
+              "max_grad_norm": null,
+              "noise_multiplier": null
+            },
+            "evaluation_requirements": {
+              "min_accuracy": 0.9,
+              "min_roc_auc": 0.9,
+              "min_sensitivity": 0.8,
+              "target_dataset": "PCam Global Test Set (33,003 samples)"
+            },
+            "execution_mode": "PLANNED_ONLY",
+            "approval_required": true,
+            "approved_by": null,
+            "safety_checks": {
+              "safe_dry_run_default": true,
+              "no_automatic_production_overwrite": true,
+              "quality_gate_enforced": true,
+              "sample_buffer_sufficient": true
+            }
+          }
+        },
+        "execution_time_ms": 0.09
+      }
+    },
+    {
+      "stage_number": 10,
+      "stage_name": "Training Dispatch",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5323005,
+      "details": {
+        "agent_name": "TrainingAgent",
+        "status": "SUCCESS",
+        "decision": "DRY_RUN_DISPATCHED",
+        "details": {
+          "task_spec": {
+            "strategy": "fedavg",
+            "rounds": 3,
+            "local_epochs": 1,
+            "batch_size": 64,
+            "clients": [
+              "site_0",
+              "site_1",
+              "site_2",
+              "site_3",
+              "site_4"
+            ],
+            "privacy_enabled": false,
+            "dry_run": true
+          },
+          "dispatch_summary": {
+            "task_name": "train_fedavg",
+            "dry_run": true,
+            "targeted_nodes": 5,
+            "dispatches": {
+              "site_0": {
+                "status": "SUCCESS",
+                "mode": "DRY_RUN",
+                "task": "train_fedavg",
+                "sample_count": 6161,
+                "timestamp": 1790350463.532252,
+                "message": "Simulated dry-run dispatch to Simulated Hospital Alpha (Pathology)"
+              },
+              "site_1": {
+                "status": "SUCCESS",
+                "mode": "DRY_RUN",
+                "task": "train_fedavg",
+                "sample_count": 6161,
+                "timestamp": 1790350463.532252,
+                "message": "Simulated dry-run dispatch to Simulated Hospital Beta (Oncology)"
+              },
+              "site_2": {
+                "status": "SUCCESS",
+                "mode": "DRY_RUN",
+                "task": "train_fedavg",
+                "sample_count": 6161,
+                "timestamp": 1790350463.532252,
+                "message": "Simulated dry-run dispatch to Simulated Hospital Gamma (Diagnostics)"
+              },
+              "site_3": {
+                "status": "SUCCESS",
+                "mode": "DRY_RUN",
+                "task": "train_fedavg",
+                "sample_count": 6161,
+                "timestamp": 1790350463.532252,
+                "message": "Simulated dry-run dispatch to Simulated Hospital Delta (Histology)"
+              },
+              "site_4": {
+                "status": "SUCCESS",
+                "mode": "DRY_RUN",
+                "task": "train_fedavg",
+                "sample_count": 6160,
+                "timestamp": 1790350463.532252,
+                "message": "Simulated dry-run dispatch to Simulated Hospital Epsilon (Research)"
+              }
+            },
+            "timestamp": 1790350463.532252
+          },
+          "message": "Safe dry-run training spec verified; no GPU compute consumed."
+        },
+        "execution_time_ms": 0.02
+      }
+    },
+    {
+      "stage_number": 11,
+      "stage_name": "Candidate Evaluation",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5323348,
+      "details": {
+        "agent_name": "EvaluationAgent",
+        "status": "SUCCESS",
+        "decision": "QUALITY_GATE_PASSED",
+        "details": {
+          "model_id": "candidate_fedavg_8b99c9",
+          "passed": true,
+          "failures": [],
+          "checks": {
+            "accuracy": {
+              "value": 0.9509,
+              "required": 0.9,
+              "passed": true
+            },
+            "roc_auc": {
+              "value": 0.985,
+              "required": 0.9,
+              "passed": true
+            },
+            "sensitivity": {
+              "value": 0.945,
+              "required": 0.8,
+              "passed": true
+            }
+          },
+          "quality_gate": {
+            "min_accuracy": 0.9,
+            "min_roc_auc": 0.9,
+            "min_sensitivity": 0.8,
+            "max_drift_psi": 0.25,
+            "require_checkpoint_exists": false
+          }
+        },
+        "execution_time_ms": 0.01
+      }
+    },
+    {
+      "stage_number": 12,
+      "stage_name": "Quality Gate Verification",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5323358,
+      "details": {
+        "passed": true,
+        "failures": []
+      }
+    },
+    {
+      "stage_number": 13,
+      "stage_name": "Registry Lifecycle Transition",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.532385,
+      "details": {
+        "agent_name": "RegistryAgent",
+        "status": "SUCCESS",
+        "decision": "VALIDATION_PASSED",
+        "details": {
+          "passed": true,
+          "note": "Quality gate PASSED: Acc>=0.9",
+          "model": {
+            "model_id": "candidate_fedavg_8b99c9",
+            "display_name": "candidate_fedavg_8b99c9",
+            "paradigm": "Federated (FEDAVG)",
+            "state": "VALIDATED",
+            "checkpoint_path": "artifacts/federated/fedavg/best_global_model.pt",
+            "metrics": {
+              "accuracy": 0.9509,
+              "roc_auc": 0.985,
+              "sensitivity": 0.945
+            },
+            "registered_at": 1790350463.532344,
+            "updated_at": 1790350463.532365,
+            "metadata": {},
+            "history": [
+              {
+                "state": "CANDIDATE",
+                "timestamp": 1790350463.532344,
+                "note": "Staged candidate model"
+              },
+              {
+                "state": "VALIDATED",
+                "timestamp": 1790350463.532365,
+                "note": "Quality gate PASSED: Acc>=0.9"
+              }
+            ]
+          }
+        },
+        "execution_time_ms": 0.02
+      }
+    },
+    {
+      "stage_number": 14,
+      "stage_name": "Run Summarization & Audit Logging",
+      "status": "SUCCESS",
+      "timestamp": 1790350463.5323923,
+      "details": {
+        "run_id": "mlops_run_1790350463530_8b99c9",
+        "strategy": "fedavg",
+        "dry_run": true,
+        "status": "DRY_RUN_COMPLETED",
+        "total_stages": 14,
+        "execution_time_ms": 1.93,
+        "drift_detected": true,
+        "quality_gate_passed": true,
+        "staged_candidate_id": "candidate_fedavg_8b99c9"
+      }
+    }
+  ],
+  "summary": {
+    "run_id": "mlops_run_1790350463530_8b99c9",
+    "strategy": "fedavg",
+    "dry_run": true,
+    "status": "DRY_RUN_COMPLETED",
+    "total_stages": 14,
+    "execution_time_ms": 1.93,
+    "drift_detected": true,
+    "quality_gate_passed": true,
+    "staged_candidate_id": "candidate_fedavg_8b99c9"
+  }
+}

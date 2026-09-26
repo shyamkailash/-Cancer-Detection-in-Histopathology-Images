@@ -1,0 +1,28 @@
+{
+  "agent_name": "DriftAgent",
+  "status": "SUCCESS",
+  "decision": "DRIFT_DETECTED",
+  "details": {
+    "status": "DRIFT",
+    "drift_detected": true,
+    "statistic_value": 0.6987938586559238,
+    "metric_name": "psi",
+    "warning_threshold": 0.1,
+    "critical_threshold": 0.25,
+    "baseline_summary": {
+      "mean": 0.5,
+      "std": 0.4,
+      "count": 2
+    },
+    "current_summary": {
+      "mean": 0.5,
+      "std": 0.05000000000000002,
+      "count": 2
+    },
+    "explanation": "Critical statistical drift detected: Population Stability Index (0.6988) >= critical threshold (0.2500).",
+    "disclaimer": "Prediction distribution drift detector. Academic statistical monitoring, not a clinical diagnostic tool."
+  },
+  "execution_time_ms": 0.47,
+  "event_id": "drift_1790350655621",
+  "timestamp": 1790350655.6213741
+}

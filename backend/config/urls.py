@@ -21,6 +21,7 @@ def api_root(request):
             'predict': '/api/predict/',
             'models': '/api/models/',
             'demo': '/api/demo/',
+            'mlops': '/api/mlops/status/',
             'admin': '/admin/',
         }
     })
@@ -31,4 +32,5 @@ urlpatterns = [
     path('api/', api_root, name='api-root'),
     path('api/', include('apps.core.urls')),
     path('api/', include('apps.predictions.urls')),
+    path('api/mlops/', include('apps.mlops.urls')),
 ]
