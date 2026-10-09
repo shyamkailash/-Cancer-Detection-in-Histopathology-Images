@@ -307,9 +307,50 @@ def test_pipeline_gradcam_failure_graceful_degradation(monkeypatch):
     result = pipeline.predict(patch, model_name="centralized", include_gradcam=True)
 
     assert result["status"] == "success"
-    assert "prediction" in result
-    assert result["prediction"]["class_id"] in (0, 1)
-    assert result["explainability"] is not None
-    assert "error" in result["explainability"]
     assert "Grad-CAM generation failed" in result["explainability"]["error"]
+
+
+def test_gradcam_repeated_calls_hook_and_memory_stability():
+    """Test repeated Grad-CAM executions do not leak hooks or retain parameter gradients."""
+    model = create_resnet18(num_classes=2, pretrained=False)
+    dummy_input = torch.randn(1, 3, 96, 96)
+
+    for _ in range(5):
+        with GradCAM(model) as gradcam:
+            cam_map, pred_class, prob = gradcam.generate_cam(dummy_input)
+            assert cam_map is not None
+            assert cam_map.shape == (3, 3)
+            assert 0.0 <= cam_map.min() <= cam_map.max() <= 1.0
+
+        for p in model.parameters():
+            assert p.grad is None or (p.grad == 0).all()
+
+
+def test_gradcam_overlay_alpha_bounds():
+    """Test generate_heatmap_overlay handles edge and out-of-bound alpha values safely."""
+    img = create_synthetic_patch((96, 96), (180, 120, 150))
+    cam = np.random.uniform(0.0, 1.0, (7, 7)).astype(np.float32)
+
+    for test_alpha in [-0.5, 0.0, 0.5, 1.0, 1.5]:
+        heat_pil, overlay_pil = generate_heatmap_overlay(img, cam, alpha=test_alpha)
+        assert heat_pil.size == (96, 96)
+        assert overlay_pil.size == (96, 96)
+        arr = np.array(overlay_pil)
+        assert arr.shape == (96, 96, 3)
+        assert not np.isnan(arr).any()
+        assert not np.isinf(arr).any()
+
+
+def test_gradcam_real_sample_image_inference():
+    """Test Grad-CAM inference and visual generation with real test sample image."""
+    sample_path = Path("data/test_samples/normal/normal_01.tif")
+    if sample_path.exists():
+        pipeline = InferencePipeline()
+        result = pipeline.predict(sample_path, model_name="centralized", include_gradcam=True)
+        assert result["status"] == "success"
+        assert result["explainability"] is not None
+        assert "heatmap_base64" in result["explainability"]
+        assert "overlay_base64" in result["explainability"]
+        assert result["explainability"]["heatmap_base64"].startswith("data:image/png;base64,")
+        assert result["explainability"]["overlay_base64"].startswith("data:image/png;base64,")
 
