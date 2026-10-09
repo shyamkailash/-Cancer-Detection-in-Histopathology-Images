@@ -8,6 +8,7 @@ from .development import *  # noqa: F401, F403
 # Override for testing
 DEBUG = False
 SECRET_KEY = 'test-secret-key-not-for-production'
+ALLOWED_HOSTS = ['*']
 
 # Database - isolated in-memory SQLite for tests
 DATABASES = {
