@@ -1,0 +1,12 @@
+{
+    "model": "centralized",
+    "model_display_name": "Centralized ResNet-18",
+    "total_images": 10,
+    "correct": 8,
+    "wrong": 2,
+    "accuracy": 0.8,
+    "normal_recall": 0.8,
+    "tumor_recall": 0.8,
+    "device": "cpu",
+    "note": "These samples are extracted from the PCam training dataset. Results are for labeled-sample sanity checking and demonstration, not unbiased test-set evaluation."
+}

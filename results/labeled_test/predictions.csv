@@ -1,0 +1,11 @@
+image,actual,prediction,confidence,normal_probability,tumor_probability,correct,inference_time_ms
+normal_01.tif,NORMAL,NORMAL,0.8539,0.8539,0.1461,True,335.9
+normal_02.tif,NORMAL,NORMAL,0.9882,0.9882,0.0118,True,53.56
+normal_03.tif,NORMAL,TUMOR,0.8684,0.1316,0.8684,False,53.59
+normal_04.tif,NORMAL,NORMAL,0.9856,0.9856,0.0144,True,52.86
+normal_05.tif,NORMAL,NORMAL,0.9937,0.9937,0.0063,True,56.79
+tumor_01.tif,TUMOR,NORMAL,0.8653,0.8653,0.1347,False,53.25
+tumor_02.tif,TUMOR,TUMOR,0.9997,0.0003,0.9997,True,57.8
+tumor_03.tif,TUMOR,TUMOR,0.5297,0.4703,0.5297,True,53.6
+tumor_04.tif,TUMOR,TUMOR,0.9089,0.0911,0.9089,True,53.61
+tumor_05.tif,TUMOR,TUMOR,0.5054,0.4946,0.5054,True,52.73
