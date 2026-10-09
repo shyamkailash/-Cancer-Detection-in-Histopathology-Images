@@ -151,3 +151,101 @@ def test_demo_view_endpoint(api_client):
     assert b"Privacy-Preserving DP-FedAvg (94.33% Acc)" in response.content
     assert b"errorBox" in response.content
 
+
+def test_predict_response_schema_and_probability_constraints(api_client):
+    """Validate full response contract, probability bounds, and metadata consistency."""
+    img_file = create_test_image_file("schema_test.png", size=(96, 96))
+    response = api_client.post(
+        "/api/predict/",
+        data={"image": img_file, "model_name": "centralized_finetuned", "include_gradcam": True},
+        format="multipart",
+    )
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+
+    # Schema checks
+    assert data["status"] == "success"
+    assert "prediction" in data
+    assert "model" in data
+    assert "image_metadata" in data
+    assert "explainability" in data
+    assert "inference_time_ms" in data
+    assert "disclaimer" in data
+
+    # Prediction checks
+    pred = data["prediction"]
+    assert pred["class_id"] in (0, 1)
+    assert pred["class_name"] in ("normal", "metastasis")
+    assert isinstance(pred["description"], str) and len(pred["description"]) > 0
+    assert 0.0 <= pred["confidence"] <= 1.0
+
+    probs = pred["probabilities"]
+    assert 0.0 <= probs["normal"] <= 1.0
+    assert 0.0 <= probs["metastasis"] <= 1.0
+    assert abs((probs["normal"] + probs["metastasis"]) - 1.0) < 1e-3
+    assert pred["confidence"] == max(probs["normal"], probs["metastasis"])
+
+    # Model metadata checks
+    model_meta = data["model"]
+    assert model_meta["id"] == "centralized_finetuned"
+    assert "Centralized ResNet-18 Fine-Tuned" in model_meta["display_name"]
+    assert model_meta["paradigm"] == "Centralized Transfer Learning"
+    assert "device" in model_meta
+
+    # Image metadata checks
+    img_meta = data["image_metadata"]
+    assert img_meta["original_width"] == 96
+    assert img_meta["original_height"] == 96
+    assert img_meta["input_channels"] == 3
+    assert img_meta["processed_size"] == [96, 96]
+
+    # Explainability checks
+    exp = data["explainability"]
+    assert exp["method"] == "Grad-CAM"
+    assert exp["target_layer"] == "layer4"
+    assert exp["explained_class_id"] in (0, 1)
+    assert exp["heatmap_base64"].startswith("data:image/png;base64,")
+    assert exp["overlay_base64"].startswith("data:image/png;base64,")
+    assert exp["original_base64"].startswith("data:image/png;base64,")
+    assert data["inference_time_ms"] > 0
+
+
+def test_predict_sequential_error_recovery(api_client):
+    """Verify that failed requests do not poison model cache or break subsequent valid requests."""
+    # 1. Failed request (bad image)
+    corrupted = SimpleUploadedFile("broken.png", b"invalid_bytes", content_type="image/png")
+    resp_fail1 = api_client.post("/api/predict/", data={"image": corrupted}, format="multipart")
+    assert resp_fail1.status_code == status.HTTP_400_BAD_REQUEST
+
+    # 2. Failed request (bad model name)
+    valid_file = create_test_image_file("valid1.png")
+    resp_fail2 = api_client.post("/api/predict/", data={"image": valid_file, "model_name": "non_existent"}, format="multipart")
+    assert resp_fail2.status_code == status.HTTP_400_BAD_REQUEST
+
+    # 3. Subsequent valid request should succeed normally
+    valid_file2 = create_test_image_file("valid2.png")
+    resp_ok = api_client.post("/api/predict/", data={"image": valid_file2, "model_name": "fedavg"}, format="multipart")
+    assert resp_ok.status_code == status.HTTP_200_OK
+    assert resp_ok.json()["status"] == "success"
+    assert resp_ok.json()["model"]["id"] == "fedavg"
+
+
+def test_predict_explicit_target_class_and_invalid_target_class(api_client):
+    """Test explicit target class selection and invalid target class rejection."""
+    img_file = create_test_image_file("target_class.png")
+    resp_class0 = api_client.post(
+        "/api/predict/",
+        data={"image": img_file, "target_class": "0", "include_gradcam": "true"},
+        format="multipart",
+    )
+    assert resp_class0.status_code == status.HTTP_200_OK
+    assert resp_class0.json()["explainability"]["explained_class_id"] == 0
+
+    img_file2 = create_test_image_file("target_class2.png")
+    resp_invalid = api_client.post(
+        "/api/predict/",
+        data={"image": img_file2, "target_class": "99"},
+        format="multipart",
+    )
+    assert resp_invalid.status_code == status.HTTP_400_BAD_REQUEST
+    assert "Invalid target_class" in resp_invalid.json()["error"]
