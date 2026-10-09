@@ -38,18 +38,34 @@ class InferencePipeline:
 
     def _load_image(self, image_input: Union[Image.Image, bytes, str, Path]) -> Image.Image:
         """Standardize various input formats into a PIL RGB Image."""
+        if image_input is None:
+            raise ValueError("Empty image input provided.")
+
         if isinstance(image_input, Image.Image):
             return image_input.convert("RGB")
         elif isinstance(image_input, bytes):
-            return Image.open(io.BytesIO(image_input)).convert("RGB")
+            if len(image_input) == 0:
+                raise ValueError("Empty image bytes provided.")
+            try:
+                return Image.open(io.BytesIO(image_input)).convert("RGB")
+            except Exception as exc:
+                raise ValueError(f"Invalid or unreadable image bytes: {exc}") from exc
         elif isinstance(image_input, (str, Path)):
-            path_or_str = str(image_input)
+            path_or_str = str(image_input).strip()
+            if not path_or_str:
+                raise ValueError("Empty image path or string provided.")
             if path_or_str.startswith("data:image") or len(path_or_str) > 500:
                 # Likely base64 data URI
-                return base64_to_pil(path_or_str)
+                try:
+                    return base64_to_pil(path_or_str)
+                except Exception as exc:
+                    raise ValueError(f"Invalid base64 image data: {exc}") from exc
             p = Path(path_or_str)
-            if p.exists():
-                return Image.open(p).convert("RGB")
+            if p.exists() and p.is_file():
+                try:
+                    return Image.open(p).convert("RGB")
+                except Exception as exc:
+                    raise ValueError(f"Invalid image file '{p}': {exc}") from exc
             else:
                 raise FileNotFoundError(f"Image file not found: {p.resolve()}")
         else:
@@ -69,21 +85,28 @@ class InferencePipeline:
 
         Args:
             image_input: PIL Image, raw bytes, filepath, or base64 string
-            model_name: "centralized", "fedavg", or "dp_fedavg"
+            model_name: Model identifier or alias
             include_gradcam: Whether to generate Grad-CAM heatmaps
             target_class: Specific class to explain (0 or 1). If None, explains predicted class.
             heatmap_alpha: Overlay blending opacity factor (0.0 to 1.0)
+            checkpoint_path: Optional explicit checkpoint path
 
         Returns:
             Structured dictionary with prediction, probabilities, model metadata, and base64 visuals.
         """
         start_time = time.time()
 
-        # 1. Load and validate image
+        # 1. Validate parameters
+        if target_class is not None and target_class not in (0, 1):
+            raise ValueError(f"Invalid target_class '{target_class}'. Must be 0 (normal) or 1 (metastasis).")
+
+        heatmap_alpha_clamped = float(np.clip(heatmap_alpha, 0.0, 1.0))
+
+        # 2. Load and validate image
         pil_image = self._load_image(image_input)
         orig_width, orig_height = pil_image.size
 
-        # 2. Apply preprocessing transform (Resize to 96x96, Normalize)
+        # 3. Apply preprocessing transform (Resize to 96x96, Normalize)
         transformed_np = self.transform(pil_image)
         if isinstance(transformed_np, np.ndarray):
             input_tensor = torch.from_numpy(transformed_np).unsqueeze(0).float()
@@ -92,10 +115,9 @@ class InferencePipeline:
         else:
             raise RuntimeError(f"Unexpected transform output type: {type(transformed_np)}")
 
-        # 3. Retrieve model and execute forward pass
+        # 4. Retrieve model and execute forward pass
         checkpoint = self.model_manager.resolve_checkpoint_path(model_name, checkpoint_path)
-        selected_checkpoint = str(checkpoint) if checkpoint.exists() else checkpoint_path
-        model = self.model_manager.get_model(model_name, checkpoint_path=selected_checkpoint)
+        model = self.model_manager.get_model(model_name, checkpoint_path=str(checkpoint))
         device = next(model.parameters()).device
         input_tensor = input_tensor.to(device)
 
@@ -112,18 +134,18 @@ class InferencePipeline:
 
         explain_class = target_class if target_class is not None else pred_class_id
 
-        # 4. Generate Grad-CAM Explainability Heatmap
+        # 5. Generate Grad-CAM Explainability Heatmap with guaranteed cleanup
         explainability = None
         if include_gradcam:
+            gradcam = None
             try:
                 gradcam = GradCAM(model)
                 cam_map, _, _ = gradcam.generate_cam(input_tensor, target_class=explain_class)
-                gradcam.remove_hooks()
 
                 heatmap_pil, overlay_pil = generate_heatmap_overlay(
                     original_image=pil_image,
                     cam_map=cam_map,
-                    alpha=heatmap_alpha,
+                    alpha=heatmap_alpha_clamped,
                 )
 
                 explainability = {
@@ -140,6 +162,10 @@ class InferencePipeline:
                     "method": "Grad-CAM",
                     "error": f"Grad-CAM generation failed: {str(exc)}",
                 }
+            finally:
+                if gradcam is not None:
+                    gradcam.remove_hooks()
+                model.zero_grad()
 
         elapsed_ms = (time.time() - start_time) * 1000.0
 
@@ -160,7 +186,7 @@ class InferencePipeline:
                 "display_name": model_info["display_name"],
                 "paradigm": model_info["paradigm"],
                 "device": str(device),
-                "checkpoint_path": str(checkpoint.resolve()),
+                "checkpoint_path": str(checkpoint),
             },
             "image_metadata": {
                 "original_width": orig_width,

@@ -75,6 +75,11 @@ class PredictAPIView(APIView):
             )
             return Response(result, status=status.HTTP_200_OK)
 
+        except FileNotFoundError as fnf_err:
+            return Response(
+                {"status": "error", "error": str(fnf_err)},
+                status=status.HTTP_404_NOT_FOUND,
+            )
         except ValueError as val_err:
             return Response(
                 {"status": "error", "error": str(val_err)},
@@ -148,6 +153,7 @@ class DemoView(APIView):
         .img-card img { width: 100%; height: auto; border-radius: 4px; object-fit: cover; }
         .img-card span { display: block; font-size: 0.8rem; font-weight: 600; margin-top: 6px; color: var(--text-muted); }
         .meta-tag { font-size: 0.8rem; color: var(--text-muted); margin-top: 10px; }
+        .alert-error { display: none; margin-top: 16px; padding: 12px 14px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: 0.85rem; color: var(--danger); }
         .disclaimer-box { margin-top: 24px; padding: 12px 16px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; font-size: 0.8rem; color: #92400e; }
     </style>
 </head>
@@ -176,14 +182,16 @@ class DemoView(APIView):
                     <label for="modelSelect">2. Choose Model Architecture</label>
                     <select id="modelSelect">
                         <option value="centralized">Centralized ResNet-18 (94.13% Acc)</option>
-                        <option value="fedavg">Federated ResNet-18 FedAvg (88.80% Acc)</option>
-                        <option value="fedprox">Federated ResNet-18 FedProx (mu=0.01)</option>
-                        <option value="fedbn">Federated ResNet-18 FedBN (Local BatchNorm)</option>
-                        <option value="dp_fedavg">Privacy-Preserving DP-FedAvg (67.20% Acc)</option>
+                        <option value="centralized_finetuned">Centralized ResNet-18 Fine-Tuned (95.35% Acc)</option>
+                        <option value="fedavg">Federated ResNet-18 FedAvg (95.09% Acc)</option>
+                        <option value="fedprox">Federated ResNet-18 FedProx (95.05% Acc)</option>
+                        <option value="fedbn">Federated ResNet-18 FedBN (91.77% Acc)</option>
+                        <option value="dp_fedavg">Privacy-Preserving DP-FedAvg (94.33% Acc)</option>
                     </select>
                 </div>
 
                 <button id="predictBtn" onclick="runPrediction()">Analyze Patch</button>
+                <div id="errorBox" class="alert-error"></div>
             </div>
 
             <!-- Results Column -->
@@ -211,9 +219,9 @@ class DemoView(APIView):
                         <div class="prob-bar"><div id="fillNormal" class="prob-fill fill-normal" style="width:0%"></div></div>
                     </div>
 
-                    <div class="img-grid">
+                    <div class="img-grid" id="imgGrid">
                         <div class="img-card">
-                            <img id="imgOriginal" src="" alt="Original Patch">
+                            <img id="imgOriginal" src="" alt="Input Patch">
                             <span>Input Patch</span>
                         </div>
                         <div class="img-card">
@@ -221,7 +229,7 @@ class DemoView(APIView):
                             <span>Grad-CAM Heatmap</span>
                         </div>
                         <div class="img-card">
-                            <img id="imgOverlay" src="" alt="Grad-CAM Overlay">
+                            <img id="imgOverlay" src="" alt="Diagnostic Overlay">
                             <span>Diagnostic Overlay</span>
                         </div>
                     </div>
@@ -243,8 +251,50 @@ class DemoView(APIView):
     <script>
         let selectedFile = null;
 
+        function showError(msg) {
+            const errBox = document.getElementById('errorBox');
+            errBox.textContent = msg;
+            errBox.style.display = 'block';
+        }
+
+        function clearError() {
+            const errBox = document.getElementById('errorBox');
+            errBox.textContent = '';
+            errBox.style.display = 'none';
+        }
+
+        // Dynamically populate model selection from authoritative API
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const resp = await fetch('/api/models/');
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.status === 'success' && Array.isArray(data.models) && data.models.length > 0) {
+                        const select = document.getElementById('modelSelect');
+                        select.innerHTML = '';
+                        data.models.forEach(m => {
+                            const opt = document.createElement('option');
+                            opt.value = m.id;
+                            const accStr = m.benchmark_accuracy != null ? ` (${Number(m.benchmark_accuracy).toFixed(2)}% Acc)` : '';
+                            const availStr = m.checkpoint_exists ? '' : ' [Missing Checkpoint]';
+                            opt.textContent = `${m.display_name}${accStr}${availStr}`;
+                            if (!m.checkpoint_exists) {
+                                opt.disabled = true;
+                            }
+                            select.appendChild(opt);
+                        });
+                        const firstActive = Array.from(select.options).find(o => !o.disabled);
+                        if (firstActive) select.value = firstActive.value;
+                    }
+                }
+            } catch (e) {
+                console.warn('Using default model dropdown entries.', e);
+            }
+        });
+
         function handleFile(file) {
             if (!file) return;
+            clearError();
             selectedFile = file;
             const reader = new FileReader();
             reader.onload = e => {
@@ -264,8 +314,9 @@ class DemoView(APIView):
         });
 
         async function runPrediction() {
+            clearError();
             if (!selectedFile) {
-                alert("Please select or drop an image patch first.");
+                showError("Please select or drop an image patch first.");
                 return;
             }
             const modelName = document.getElementById('modelSelect').value;
@@ -283,14 +334,16 @@ class DemoView(APIView):
                 const data = await resp.json();
                 document.getElementById('loading').style.display = 'none';
 
-                if (data.status === 'success') {
+                if (resp.ok && data.status === 'success') {
                     renderResults(data);
                 } else {
-                    alert("Prediction error: " + (data.error || "Unknown error"));
+                    document.getElementById('emptyState').style.display = 'block';
+                    showError(data.error || ("Server error: HTTP " + resp.status));
                 }
             } catch (err) {
                 document.getElementById('loading').style.display = 'none';
-                alert("Network error: " + err.message);
+                document.getElementById('emptyState').style.display = 'block';
+                showError("Network communication error: " + err.message);
             }
         }
 
@@ -314,10 +367,14 @@ class DemoView(APIView):
             document.getElementById('probNormalText').innerText = pNorm + '%';
             document.getElementById('fillNormal').style.width = pNorm + '%';
 
-            if (data.explainability) {
-                document.getElementById('imgOriginal').src = data.explainability.original_base64;
-                document.getElementById('imgHeatmap').src = data.explainability.heatmap_base64;
-                document.getElementById('imgOverlay').src = data.explainability.overlay_base64;
+            const exp = data.explainability;
+            if (exp && exp.original_base64 && exp.heatmap_base64 && exp.overlay_base64) {
+                document.getElementById('imgGrid').style.display = 'grid';
+                document.getElementById('imgOriginal').src = exp.original_base64;
+                document.getElementById('imgHeatmap').src = exp.heatmap_base64;
+                document.getElementById('imgOverlay').src = exp.overlay_base64;
+            } else {
+                document.getElementById('imgGrid').style.display = 'none';
             }
 
             document.getElementById('metaInfo').innerText =

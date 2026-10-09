@@ -4,7 +4,6 @@ Supports Centralized, FedAvg, FedProx, FedBN, and DP-FedAvg ResNet-18 variants.
 """
 
 from pathlib import Path
-from typing import Dict, Any, List, Optional
 from typing import Dict, Any, List, Optional, Union
 import torch
 import torch.nn as nn
@@ -140,25 +139,23 @@ class ModelManager:
         """Return catalog of available models and their status."""
         catalog = []
         for model_id, cfg in MODEL_REGISTRY_CONFIG.items():
-            ckpt_path = Path(cfg["default_checkpoint"])
-            fallback_path = Path(cfg.get("fallback_checkpoint", ""))
-            has_ckpt = ckpt_path.exists() or (fallback_path.exists() if str(fallback_path) else False)
             default_str = cfg.get("default_checkpoint", "")
             fallback_str = cfg.get("fallback_checkpoint", "")
 
-            chosen_path = str(ckpt_path) if ckpt_path.exists() else (str(fallback_path) if fallback_path.exists() else "")
             default_abs = self._resolve_path(default_str)
             fallback_abs = self._resolve_path(fallback_str)
 
-            if default_str and default_abs.exists():
+            if default_str and default_abs.exists() and default_abs.is_file():
                 has_ckpt = True
                 chosen_path = default_str
-            elif fallback_str and fallback_abs.exists():
+            elif fallback_str and fallback_abs.exists() and fallback_abs.is_file():
                 has_ckpt = True
                 chosen_path = fallback_str
             else:
                 has_ckpt = False
                 chosen_path = ""
+
+            is_cached = any(k.startswith(f"{model_id}:") for k in self._models)
 
             catalog.append({
                 "id": model_id,
@@ -167,8 +164,7 @@ class ModelManager:
                 "paradigm": cfg["paradigm"],
                 "checkpoint_exists": has_ckpt,
                 "checkpoint_path": chosen_path,
-                "is_cached": model_id in self._models,
-                "is_cached": any(k.startswith(f"{model_id}:") for k in self._models),
+                "is_cached": is_cached,
                 "benchmark_accuracy": cfg.get("benchmark_accuracy"),
                 "benchmark_sensitivity": cfg.get("benchmark_sensitivity"),
                 "benchmark_roc_auc": cfg.get("benchmark_roc_auc"),
@@ -183,107 +179,97 @@ class ModelManager:
         cfg["device"] = str(self.device)
         return cfg
 
+    def resolve_checkpoint_path(
+        self,
+        model_name: str = "centralized",
+        checkpoint_path: Optional[Union[str, Path]] = None,
+    ) -> Path:
+        """Resolve the checkpoint selected for a model without loading it."""
+        canonical = self.canonicalize_model_name(model_name)
+
+        if checkpoint_path:
+            p = Path(checkpoint_path)
+            abs_p = self._resolve_path(p)
+            if not abs_p.exists() or not abs_p.is_file():
+                raise FileNotFoundError(f"Checkpoint file not found: {abs_p}")
+            return p
+
+        cfg = MODEL_REGISTRY_CONFIG[canonical]
+        default_str = cfg.get("default_checkpoint", "")
+        default_abs = self._resolve_path(default_str)
+        if default_str and default_abs.exists() and default_abs.is_file():
+            return Path(default_str)
+
+        fallback_str = cfg.get("fallback_checkpoint", "")
+        fallback_abs = self._resolve_path(fallback_str)
+        if fallback_str and fallback_abs.exists() and fallback_abs.is_file():
+            return Path(fallback_str)
+
+        raise FileNotFoundError(
+            f"No valid checkpoint found for model '{canonical}'. Checked default '{default_abs}' and fallback '{fallback_abs}'."
+        )
+
     def get_model(
         self,
         model_name: str = "centralized",
-        checkpoint_path: Optional[str] = None,
+        checkpoint_path: Optional[Union[str, Path]] = None,
     ) -> nn.Module:
         """
         Get or load the requested model. Caches loaded models in memory.
+        Raises FileNotFoundError if no valid checkpoint exists.
+        Never silently uses randomly initialized or ImageNet weights.
         """
         canonical = self.canonicalize_model_name(model_name)
+        selected_checkpoint = self.resolve_checkpoint_path(canonical, checkpoint_path=checkpoint_path)
+        abs_path = self._resolve_path(selected_checkpoint)
 
-        cfg = MODEL_REGISTRY_CONFIG[canonical]
-        ckpt_path = Path(checkpoint_path) if checkpoint_path else Path(cfg["default_checkpoint"])
-
-        if checkpoint_path and not ckpt_path.exists():
-            raise FileNotFoundError(f"Checkpoint file not found: {ckpt_path.resolve()}")
-        target_path_str = checkpoint_path or cfg.get("default_checkpoint", "")
-        abs_path = self._resolve_path(target_path_str)
-
-        if not checkpoint_path and not ckpt_path.exists() and "fallback_checkpoint" in cfg:
-            fallback = Path(cfg["fallback_checkpoint"])
-            if fallback.exists():
-                ckpt_path = fallback
-        if checkpoint_path and not abs_path.exists():
-            raise FileNotFoundError(f"Checkpoint file not found: {abs_path}")
-
-        cache_key = f"{canonical}:{ckpt_path.resolve()}"
-        if not checkpoint_path and not abs_path.exists() and "fallback_checkpoint" in cfg:
-            fallback_abs = self._resolve_path(cfg["fallback_checkpoint"])
-            if fallback_abs.exists():
-                abs_path = fallback_abs
-
-        cache_key = f"{canonical}:{abs_path}"
+        cache_key = f"{canonical}:{str(abs_path)}"
         if cache_key in self._models:
             return self._models[cache_key]
 
-        # Initialize ResNet-18
-        model = create_resnet18(num_classes=2, pretrained=True).to(self.device)
+        if not abs_path.exists() or not abs_path.is_file():
+            raise FileNotFoundError(f"Checkpoint file not found for model '{canonical}': {abs_path}")
 
-        if ckpt_path.exists():
-            checkpoint = torch.load(str(ckpt_path), map_location=self.device, weights_only=False)
-        if abs_path.exists() and abs_path.is_file():
+        # Initialize ResNet-18 skeleton without downloading ImageNet weights
+        model = create_resnet18(num_classes=2, pretrained=False).to(self.device)
+
+        try:
             checkpoint = torch.load(str(abs_path), map_location=self.device, weights_only=False)
-            state_dict = checkpoint.get("model_state_dict") if isinstance(checkpoint, dict) else None
-            if state_dict is None and isinstance(checkpoint, dict):
-                state_dict = checkpoint
-            if not isinstance(state_dict, dict):
-                raise ValueError(
-                    f"Checkpoint '{ckpt_path}' does not contain a valid model_state_dict"
-                    f"Checkpoint '{abs_path}' does not contain a valid model_state_dict"
-                )
-            try:
-                model.load_state_dict(state_dict, strict=True)
-            except RuntimeError as exc:
-                raise ValueError(
-                    f"Checkpoint '{ckpt_path}' is incompatible with the expected ResNet-18 architecture: {exc}"
-                    f"Checkpoint '{abs_path}' is incompatible with the expected ResNet-18 architecture: {exc}"
-                ) from exc
+        except Exception as exc:
+            raise ValueError(f"Checkpoint '{abs_path}' is corrupted or unreadable: {exc}") from exc
+
+        if isinstance(checkpoint, dict):
+            state_dict = checkpoint.get("model_state_dict") or checkpoint.get("state_dict") or checkpoint
         else:
-            # Fallback to pretrained weights if checkpoint file is not yet generated
-            pass
+            state_dict = None
+
+        if not isinstance(state_dict, dict) or not state_dict:
+            raise ValueError(f"Checkpoint '{abs_path}' does not contain a valid model_state_dict")
+
+        # Strip DataParallel 'module.' prefix if present
+        cleaned_state_dict = {}
+        for k, v in state_dict.items():
+            key = k[7:] if k.startswith("module.") else k
+            cleaned_state_dict[key] = v
+
+        try:
+            model.load_state_dict(cleaned_state_dict, strict=True)
+        except RuntimeError as exc:
+            raise ValueError(
+                f"Checkpoint '{abs_path}' is incompatible with the expected ResNet-18 architecture: {exc}"
+            ) from exc
 
         model.eval()
         self._models[cache_key] = model
         return model
 
-    def resolve_checkpoint_path(
-        self,
-        model_name: str = "centralized",
-        checkpoint_path: Optional[str] = None,
-    ) -> Path:
-        """Resolve the checkpoint selected for a model without loading it."""
-        canonical = self.canonicalize_model_name(model_name)
-        if checkpoint_path:
-            path = Path(checkpoint_path)
-            if not path.exists():
-                raise FileNotFoundError(f"Checkpoint file not found: {path.resolve()}")
-            abs_path = self._resolve_path(path)
-            if not abs_path.exists():
-                raise FileNotFoundError(f"Checkpoint file not found: {abs_path}")
-            return path
-
-        config = MODEL_REGISTRY_CONFIG[canonical]
-        path = Path(config["default_checkpoint"])
-        if not path.exists() and config.get("fallback_checkpoint"):
-            fallback = Path(config["fallback_checkpoint"])
-            if fallback.exists():
-                return fallback
-        return path
-        default_path = Path(config["default_checkpoint"])
-        if self._resolve_path(default_path).exists():
-            return default_path
-        if config.get("fallback_checkpoint"):
-            fallback_path = Path(config["fallback_checkpoint"])
-            if self._resolve_path(fallback_path).exists():
-                return fallback_path
-        return default_path
-
     def preload_all(self):
         """Preload all configured models into memory."""
         for model_id in MODEL_REGISTRY_CONFIG:
-            self.get_model(model_id)
+            try:
+                self.get_model(model_id)
+            except Exception:
+                pass
 
 
 # Global singleton instance

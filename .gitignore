@@ -94,3 +94,11 @@ artifacts/predictions/*.png
 # Generated fine-tuning and inference artifacts
 artifacts/finetuning/
 artifacts/predictions_finetuned_test/
+
+
+# =============================================================================
+# Generated MLOps Runtime Artifacts
+# =============================================================================
+artifacts/mlops/drift/*.json
+artifacts/mlops/retraining/*.json
+artifacts/mlops/runs/*.json

@@ -88,7 +88,13 @@ To protect parameter updates against gradient inversion and membership inference
 2. **Calibrated Gaussian Perturbation:**
    $$\hat{g}_i = \tilde{g}_i + \mathcal{N}\left(0, \sigma^2 C^2 \mathbf{I}\right)$$
 
-where $C$ is `--max-grad-norm` ($1.0$) and $\sigma$ is `--noise-multiplier` ($0.05$).
+where $C$ is `--max-grad-norm` ($1.0$) and $\sigma$ is `--noise-multiplier` ($1.0$) for the reported DP-FedAvg experiment.
+
+**Privacy accounting limitation:** The implementation applies gradient
+clipping and Gaussian noise, but formal epsilon accounting has not been
+implemented or verified. Therefore, a formal differential-privacy
+guarantee is not claimed.
+
 
 ---
 
@@ -97,10 +103,11 @@ where $C$ is `--max-grad-norm` ($1.0$) and $\sigma$ is `--noise-multiplier` ($0.
 | Model | Paradigm | Accuracy | Sensitivity (Metastasis Recall) | Specificity (Normal Tissue) | Precision | F1-Score | ROC-AUC |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Centralized Baseline** | Centralized Pooled Training | **94.13%** | **89.68%** | **97.16%** | **95.56%** | **92.52%** | **0.9822** |
-| **Federated (FedAvg)** | Federated Learning (FedAvg) | **88.80%** | **86.97%** | **90.07%** | **85.87%** | **86.42%** | **0.9522** |
-| **Federated (FedProx)** | Federated Learning (FedProx, $\mu=0.01$) | **84.07%** | **72.26%** | **92.44%** | **87.15%** | **79.01%** | **0.9138** |
-| **Federated (FedBN)** | Federated Learning (Local BatchNorm) | **59.96%** | **5.40%** | **98.65%** | **74.00%** | **10.07%** | **0.6636** |
-| **Privacy-Preserving (DP-FedAvg)** | Federated Learning + DP ($C=1.0, \sigma=0.05$) | **67.20%** | **28.31%** | **94.18%** | **77.14%** | **41.42%** | **0.7370** |
+| **Centralized Fine-Tuned** | 2-Stage Transfer Learning | **95.35%** | **94.18%** | **96.14%** | **94.32%** | **94.25%** | **0.9882** |
+| **Federated (FedAvg)** | Federated Learning (FedAvg) | **95.09%** | **92.03%** | **97.17%** | **95.68%** | **93.81%** | **0.9872** |
+| **Federated (FedProx)** | Federated Learning (FedProx, $\mu=0.01$) | **95.05%** | **91.91%** | **97.19%** | **95.70%** | **93.77%** | **0.9870** |
+| **Federated (FedBN)** | Federated Learning (Local BatchNorm) | **91.77%** | **82.18%** | **98.30%** | **97.05%** | **89.00%** | **0.9796** |
+| **Privacy-Preserving (DP-FedAvg)** | Federated Learning + DP ($C=1.0, \sigma=1.0$) | **94.33%** | **90.44%** | **96.98%** | **95.32%** | **92.82%** | **0.9831** |
 
 ---
 

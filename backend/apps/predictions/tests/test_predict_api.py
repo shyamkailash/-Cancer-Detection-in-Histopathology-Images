@@ -34,9 +34,10 @@ def test_models_list_endpoint(api_client):
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert data["status"] == "success"
-    assert len(data["models"]) >= 5
+    assert len(data["models"]) == 6
     model_ids = [m["id"] for m in data["models"]]
     assert "centralized" in model_ids
+    assert "centralized_finetuned" in model_ids
     assert "fedavg" in model_ids
     assert "fedprox" in model_ids
     assert "fedbn" in model_ids
@@ -93,25 +94,19 @@ def test_predict_endpoint_base64_payload(api_client):
     assert data["explainability"] is None
 
 
-def test_predict_endpoint_fedprox_and_fedbn(api_client):
-    """Test POST /api/predict/ with fedprox and fedbn model selections."""
-    img_file_prox = create_test_image_file("patch_prox.png")
-    resp_prox = api_client.post(
-        "/api/predict/",
-        data={"image": img_file_prox, "model_name": "fedprox"},
-        format="multipart",
-    )
-    assert resp_prox.status_code == status.HTTP_200_OK
-    assert resp_prox.json()["model"]["id"] == "fedprox"
-
-    img_file_bn = create_test_image_file("patch_bn.png")
-    resp_bn = api_client.post(
-        "/api/predict/",
-        data={"image": img_file_bn, "model_name": "fedbn"},
-        format="multipart",
-    )
-    assert resp_bn.status_code == status.HTTP_200_OK
-    assert resp_bn.json()["model"]["id"] == "fedbn"
+def test_predict_endpoint_all_models(api_client):
+    """Test POST /api/predict/ with centralized_finetuned, fedprox, fedbn, and dp_fedavg."""
+    for model_name in ["centralized_finetuned", "fedprox", "fedbn", "dp_fedavg"]:
+        img_file = create_test_image_file(f"patch_{model_name}.png")
+        resp = api_client.post(
+            "/api/predict/",
+            data={"image": img_file, "model_name": model_name},
+            format="multipart",
+        )
+        assert resp.status_code == status.HTTP_200_OK
+        data = resp.json()
+        assert data["model"]["id"] == model_name
+        assert data["status"] == "success"
 
 
 def test_predict_endpoint_missing_image(api_client):
@@ -121,6 +116,16 @@ def test_predict_endpoint_missing_image(api_client):
     data = response.json()
     assert data["status"] == "error"
     assert "No image provided" in data["error"]
+
+
+def test_predict_endpoint_corrupted_image(api_client):
+    """Test POST /api/predict/ with corrupted bytes returns 400 Bad Request."""
+    corrupted_file = SimpleUploadedFile("corrupt.png", b"not an image", content_type="image/png")
+    response = api_client.post("/api/predict/", data={"image": corrupted_file}, format="multipart")
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    data = response.json()
+    assert data["status"] == "error"
+    assert "Invalid or unreadable image bytes" in data["error"]
 
 
 def test_predict_endpoint_invalid_model(api_client):
@@ -142,4 +147,7 @@ def test_demo_view_endpoint(api_client):
     assert response.status_code == status.HTTP_200_OK
     assert "text/html" in response["Content-Type"]
     assert b"Privacy-Preserving Federated Cancer Detection" in response.content
+    assert b"Centralized ResNet-18 Fine-Tuned (95.35% Acc)" in response.content
+    assert b"Privacy-Preserving DP-FedAvg (94.33% Acc)" in response.content
+    assert b"errorBox" in response.content
 

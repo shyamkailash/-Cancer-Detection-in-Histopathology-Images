@@ -41,10 +41,12 @@ def generate_heatmap_overlay(
     """
     orig_rgb = original_image.convert("RGB")
     width, height = orig_rgb.size
+    alpha_clamped = float(np.clip(alpha, 0.0, 1.0))
 
     # Resize CAM map to match original image dimensions
     cam_img = Image.fromarray((cam_map * 255.0).astype(np.uint8), mode="L")
-    cam_resized = cam_img.resize((width, height), resample=Image.BILINEAR)
+    resample_mode = getattr(Image, "Resampling", Image).BILINEAR
+    cam_resized = cam_img.resize((width, height), resample=resample_mode)
     cam_arr = np.array(cam_resized, dtype=np.float32) / 255.0
 
     # Colorize
@@ -53,7 +55,7 @@ def generate_heatmap_overlay(
 
     # Blend with original histopathology patch
     orig_arr = np.array(orig_rgb, dtype=np.float32)
-    overlay_arr = (1.0 - alpha) * orig_arr + alpha * heatmap_arr.astype(np.float32)
+    overlay_arr = (1.0 - alpha_clamped) * orig_arr + alpha_clamped * heatmap_arr.astype(np.float32)
     overlay_arr = np.clip(overlay_arr, 0.0, 255.0).astype(np.uint8)
     overlay_pil = Image.fromarray(overlay_arr, mode="RGB")
 
@@ -105,6 +107,14 @@ class GradCAM:
         self._handlers = []
         self._register_hooks()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.remove_hooks()
+        if hasattr(self, "model") and self.model is not None:
+            self.model.zero_grad()
+
     def _register_hooks(self):
         def forward_hook(module, input, output):
             self.activations = output.detach()
@@ -117,7 +127,10 @@ class GradCAM:
 
     def remove_hooks(self):
         for h in self._handlers:
-            h.remove()
+            try:
+                h.remove()
+            except Exception:
+                pass
         self._handlers.clear()
 
     def generate_cam(
@@ -138,11 +151,15 @@ class GradCAM:
 
         # Forward pass
         outputs = self.model(input_tensor)
+        num_classes = outputs.shape[1] if outputs.ndim == 2 else 2
         probabilities = torch.softmax(outputs, dim=1)
 
         pred_class = outputs.argmax(dim=1).item()
         if target_class is None:
             target_class = pred_class
+
+        if target_class < 0 or target_class >= num_classes:
+            raise ValueError(f"Target class {target_class} is out of bounds for model with {num_classes} classes.")
 
         target_score = outputs[0, target_class]
         target_prob = probabilities[0, target_class].item()
@@ -168,14 +185,15 @@ class GradCAM:
         cam_np = cam.detach().cpu().numpy()
 
         # Normalize between 0 and 1
-        cam_min = np.min(cam_np)
-        cam_max = np.max(cam_np)
+        cam_min = float(np.min(cam_np))
+        cam_max = float(np.max(cam_np))
 
         if cam_max - cam_min > 1e-8:
             cam_normalized = (cam_np - cam_min) / (cam_max - cam_min)
         else:
             cam_normalized = np.zeros_like(cam_np)
 
+        self.model.zero_grad()
         return cam_normalized, pred_class, target_prob
 
     def __del__(self):
