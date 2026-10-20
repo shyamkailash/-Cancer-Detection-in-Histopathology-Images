@@ -53,7 +53,7 @@ jobs:
 
       - name: Verify package imports and compilation
         run: |
-          python -m compileall ml backend scripts tests
+          python -m compileall ml backend agents mlops scripts tests
 
       - name: Run Django system checks
         working-directory: ./backend
@@ -71,5 +71,5 @@ jobs:
 
       - name: Run tests with coverage
         working-directory: .
-        run: pytest --cov=backend --cov=ml --cov-report=term-missing --cov-report=xml:coverage.xml
+        run: pytest --cov=backend --cov=ml --cov=agents --cov=mlops --cov-report=term-missing --cov-report=xml:coverage.xml
         if: always()

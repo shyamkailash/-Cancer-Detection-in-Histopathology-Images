@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     # Local apps
     'apps.core',
     'apps.predictions',
+    'apps.mlops',
 ]
 
 MIDDLEWARE = [

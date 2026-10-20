@@ -37,6 +37,9 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 # Copy application code and ML packages
 COPY backend/ /app/backend/
 COPY ml/ /app/ml/
+COPY agents/ /app/agents/
+COPY mlops/ /app/mlops/
+COPY configs/ /app/configs/
 COPY data/metadata/ /app/data/metadata/
 COPY requirements/ /app/requirements/
 
