@@ -34,9 +34,34 @@ class PredictAPIView(APIView):
     """
     POST /api/predict/
     Upload a histopathology image patch (or base64 URI) to obtain cancer classification & Grad-CAM heatmap.
+
+    GET /api/predict/
+    Returns endpoint contract, parameters documentation, and usage instructions.
     """
     permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get(self, request, *args, **kwargs):
+        """Return endpoint usage instructions and parameter documentation."""
+        return Response(
+            {
+                "status": "info",
+                "message": "Histopathology Cancer Detection Prediction API. Submit a POST request with an image to classify.",
+                "method": "POST",
+                "endpoint": "/api/predict/",
+                "expected_payload": {
+                    "content_type": "multipart/form-data or application/json",
+                    "fields": {
+                        "image": "File upload (JPEG/PNG/TIFF histopathology patch)",
+                        "image_base64": "Optional base64 encoded data URI or string",
+                        "model_name": "Model identifier (centralized, centralized_finetuned, fedavg, fedprox, fedbn, dp_fedavg)",
+                        "include_gradcam": "Boolean (true/false, default true) to include Grad-CAM heatmap visualization",
+                        "target_class": "Optional integer (0: Normal, 1: Tumor)",
+                    },
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
 
     def post(self, request, *args, **kwargs):
         # 1. Retrieve image payload

@@ -3,7 +3,11 @@ Model Manager for loading, caching, and serving trained Cancer Detection models.
 Supports Centralized, FedAvg, FedProx, FedBN, and DP-FedAvg ResNet-18 variants.
 """
 
+import gc
+import os
+from collections import OrderedDict
 from pathlib import Path
+import threading
 from typing import Dict, Any, List, Optional, Union
 import torch
 import torch.nn as nn
@@ -111,15 +115,42 @@ MODEL_ALIASES = {
 class ModelManager:
     """Manages loading, caching, and serving inference models."""
 
-    def __init__(self, device: Optional[torch.device] = None):
+    def __init__(
+        self,
+        device: Optional[torch.device] = None,
+        max_cached_models: Optional[int] = None,
+    ):
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self._models: Dict[str, nn.Module] = {}
+        env_limit = int(os.environ.get("MAX_CACHED_MODELS", "2"))
+        self.max_cached_models = max_cached_models if max_cached_models is not None else env_limit
+        self._lock = threading.Lock()
+        self._models: OrderedDict[str, nn.Module] = OrderedDict()
 
     def _resolve_path(self, path_like: Optional[Union[str, Path]]) -> Path:
-        """Resolve a path to an absolute path relative to project root if relative."""
+        """Resolve a path to an absolute path relative to project root or CHECKPOINTS_DIR."""
         if not path_like:
             return Path("")
         p = Path(path_like)
+        if p.is_absolute() and p.exists():
+            return p
+
+        # Check environment variable overrides (e.g. CHECKPOINTS_DIR or MODEL_DIR)
+        env_dir = os.environ.get("CHECKPOINTS_DIR") or os.environ.get("MODEL_DIR")
+        if env_dir:
+            base_env = Path(env_dir)
+            cand = (base_env / p).resolve()
+            if cand.exists() and cand.is_file():
+                return cand
+            cand_name = (base_env / p.name).resolve()
+            if cand_name.exists() and cand_name.is_file():
+                return cand_name
+            parts = p.parts
+            if "artifacts" in parts:
+                idx = parts.index("artifacts")
+                cand_rel = (base_env / Path(*parts[idx + 1:])).resolve()
+                if cand_rel.exists() and cand_rel.is_file():
+                    return cand_rel
+
         if p.is_absolute():
             return p
         return (PROJECT_ROOT / p).resolve()
@@ -224,47 +255,66 @@ class ModelManager:
         abs_path = self._resolve_path(selected_checkpoint)
 
         cache_key = f"{canonical}:{str(abs_path)}"
-        if cache_key in self._models:
-            return self._models[cache_key]
+        with self._lock:
+            if cache_key in self._models:
+                self._models.move_to_end(cache_key)
+                return self._models[cache_key]
 
-        if not abs_path.exists() or not abs_path.is_file():
-            raise FileNotFoundError(f"Checkpoint file not found for model '{canonical}': {abs_path}")
+            if not abs_path.exists() or not abs_path.is_file():
+                raise FileNotFoundError(f"Checkpoint file not found for model '{canonical}': {abs_path}")
 
-        # Initialize ResNet-18 skeleton without downloading ImageNet weights
-        model = create_resnet18(num_classes=2, pretrained=False).to(self.device)
+            # Initialize ResNet-18 skeleton without downloading ImageNet weights
+            model = create_resnet18(num_classes=2, pretrained=False).to(self.device)
 
-        try:
-            checkpoint = torch.load(str(abs_path), map_location=self.device, weights_only=False)
-        except Exception as exc:
-            raise ValueError(f"Checkpoint '{abs_path}' is corrupted or unreadable: {exc}") from exc
+            try:
+                checkpoint = torch.load(str(abs_path), map_location=self.device, weights_only=False)
+            except Exception as exc:
+                raise ValueError(f"Checkpoint '{abs_path}' is corrupted or unreadable: {exc}") from exc
 
-        if isinstance(checkpoint, dict):
-            state_dict = checkpoint.get("model_state_dict") or checkpoint.get("state_dict") or checkpoint
-        else:
-            state_dict = None
+            if isinstance(checkpoint, dict):
+                state_dict = checkpoint.get("model_state_dict") or checkpoint.get("state_dict") or checkpoint
+            else:
+                state_dict = None
 
-        if not isinstance(state_dict, dict) or not state_dict:
-            raise ValueError(f"Checkpoint '{abs_path}' does not contain a valid model_state_dict")
+            if not isinstance(state_dict, dict) or not state_dict:
+                raise ValueError(f"Checkpoint '{abs_path}' does not contain a valid model_state_dict")
 
-        # Strip DataParallel 'module.' prefix if present
-        cleaned_state_dict = {}
-        for k, v in state_dict.items():
-            key = k[7:] if k.startswith("module.") else k
-            cleaned_state_dict[key] = v
+            # Strip DataParallel 'module.' prefix if present
+            cleaned_state_dict = {}
+            for k, v in state_dict.items():
+                key = k[7:] if k.startswith("module.") else k
+                cleaned_state_dict[key] = v
 
-        try:
-            model.load_state_dict(cleaned_state_dict, strict=True)
-        except RuntimeError as exc:
-            raise ValueError(
-                f"Checkpoint '{abs_path}' is incompatible with the expected ResNet-18 architecture: {exc}"
-            ) from exc
+            try:
+                model.load_state_dict(cleaned_state_dict, strict=True)
+            except RuntimeError as exc:
+                raise ValueError(
+                    f"Checkpoint '{abs_path}' is incompatible with the expected ResNet-18 architecture: {exc}"
+                ) from exc
 
-        model.eval()
-        self._models[cache_key] = model
-        return model
+            model.eval()
+
+            # Evict least recently used model if cache exceeds max size
+            while len(self._models) >= self.max_cached_models:
+                _, evicted_model = self._models.popitem(last=False)
+                del evicted_model
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                gc.collect()
+
+            self._models[cache_key] = model
+            return model
+
+    def clear_cache(self) -> None:
+        """Clear all cached models from memory and invoke garbage collection."""
+        with self._lock:
+            self._models.clear()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            gc.collect()
 
     def preload_all(self):
-        """Preload all configured models into memory."""
+        """Preload configured models into memory up to max cache capacity."""
         for model_id in MODEL_REGISTRY_CONFIG:
             try:
                 self.get_model(model_id)

@@ -14,8 +14,12 @@ DEBUG = config(
 )
 ALLOWED_HOSTS = config(
     'ALLOWED_HOSTS',
-    cast=lambda v: [s.strip() for s in v.split(',')]
+    default='cancer-detection-api.onrender.com,localhost,127.0.0.1,.onrender.com',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
 )
+
+# Render runs behind a reverse proxy that terminates TLS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Database - PostgreSQL
 DATABASES = {
