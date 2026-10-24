@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Third party
     'rest_framework',
+    'corsheaders',
     # Local apps
     'apps.core',
     'apps.predictions',
@@ -27,6 +28,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -151,3 +153,45 @@ LOGGING = {
 
 # Application version
 APP_VERSION = '0.1.0'
+
+# CORS configuration
+CORS_ALLOWED_ORIGINS = [
+    'https://cancer-detection-in-histopathology.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:5173',
+]
+
+_extra_cors = config('CORS_ALLOWED_ORIGINS', default='')
+if _extra_cors:
+    for _origin in _extra_cors.split(','):
+        _cleaned = _origin.strip().rstrip('/')
+        if _cleaned and _cleaned not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(_cleaned)
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\-cancer-detection.*\.vercel\.app$",
+    r"^https://cancer-detection.*\.vercel\.app$",
+]
+
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]

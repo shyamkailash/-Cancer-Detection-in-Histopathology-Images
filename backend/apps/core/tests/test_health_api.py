@@ -153,3 +153,10 @@ class TestHealthCheckIntegration:
         assert response.status_code == 503
         assert data['status'] == 'degraded'
         assert 'database connection timeout' in data['components']['database']
+
+    def test_cors_headers_returned_for_allowed_origin(self, db, api_client):
+        """Test that CORS headers are returned for allowed frontend origins."""
+        origin = 'https://cancer-detection-in-histopathology.vercel.app'
+        response = api_client.get('/api/health/', HTTP_ORIGIN=origin)
+        assert response.status_code == 200
+        assert response.headers.get('Access-Control-Allow-Origin') == origin

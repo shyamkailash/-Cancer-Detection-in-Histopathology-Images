@@ -354,3 +354,48 @@ def test_gradcam_real_sample_image_inference():
         assert result["explainability"]["heatmap_base64"].startswith("data:image/png;base64,")
         assert result["explainability"]["overlay_base64"].startswith("data:image/png;base64,")
 
+
+def test_model_manager_lru_cache_and_clear():
+    """Test ModelManager LRU bounded cache eviction and clear_cache()."""
+    from ml.inference.model_manager import ModelManager
+
+    manager = ModelManager(max_cached_models=2)
+    assert len(manager._models) == 0
+
+    # Load first model
+    m1 = manager.get_model("centralized")
+    assert len(manager._models) == 1
+
+    # Load second model
+    m2 = manager.get_model("centralized_finetuned")
+    assert len(manager._models) == 2
+
+    # Load third model - should evict centralized (LRU)
+    m3 = manager.get_model("fedavg")
+    assert len(manager._models) == 2
+    cached_keys = list(manager._models.keys())
+    assert any("centralized_finetuned:" in k for k in cached_keys)
+    assert any("fedavg:" in k for k in cached_keys)
+    assert not any("centralized:" in k for k in cached_keys)
+
+    # Clear cache
+    manager.clear_cache()
+    assert len(manager._models) == 0
+
+
+def test_model_manager_checkpoints_dir_override(tmp_path, monkeypatch):
+    """Test ModelManager resolves checkpoints from CHECKPOINTS_DIR env var."""
+    from ml.inference.model_manager import ModelManager
+
+    # Create synthetic checkpoint in tmp_path
+    custom_dir = tmp_path / "custom_ckpts"
+    custom_dir.mkdir()
+    fake_ckpt = custom_dir / "pcam_resnet18_best.pt"
+    dummy_model = create_resnet18(num_classes=2, pretrained=False)
+    torch.save({"model_state_dict": dummy_model.state_dict()}, fake_ckpt)
+
+    monkeypatch.setenv("CHECKPOINTS_DIR", str(custom_dir))
+
+    manager = ModelManager()
+    resolved = manager._resolve_path("artifacts/checkpoints/pcam_resnet18_best.pt")
+    assert resolved == fake_ckpt
