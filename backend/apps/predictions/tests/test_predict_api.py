@@ -44,6 +44,17 @@ def test_models_list_endpoint(api_client):
     assert "dp_fedavg" in model_ids
 
 
+def test_predict_endpoint_get_documentation(api_client):
+    """Test GET /api/predict/ returns 200 OK with usage instructions and schema."""
+    response = api_client.get("/api/predict/")
+    assert response.status_code == status.HTTP_200_OK
+    data = response.json()
+    assert data["status"] == "info"
+    assert data["method"] == "POST"
+    assert "expected_payload" in data
+    assert "image" in data["expected_payload"]["fields"]
+
+
 def test_predict_endpoint_multipart_upload(api_client):
     """Test POST /api/predict/ with multipart image upload."""
     img_file = create_test_image_file()

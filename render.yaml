@@ -1,0 +1,56 @@
+services:
+  - type: web
+    name: cancer-detection-api
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: gunicorn --config gunicorn.conf.py --chdir backend config.wsgi:application
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.3
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "cancer-detection-api.onrender.com,localhost,127.0.0.1,.onrender.com"
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: GUNICORN_THREADS
+        value: "2"
+      - key: MAX_CACHED_MODELS
+        value: "2"
+      - key: CHECKPOINTS_BASE_URL
+        sync: false
+      - key: ALLOW_SYNTHETIC_CHECKPOINTS
+        value: "0"
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: cancer-detection-db
+          property: database
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: cancer-detection-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: cancer-detection-db
+          property: password
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: cancer-detection-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: cancer-detection-db
+          property: port
+
+databases:
+  - name: cancer-detection-db
+    plan: free
+    region: oregon
+    databaseName: cancer_detection
+    user: cancer_user
