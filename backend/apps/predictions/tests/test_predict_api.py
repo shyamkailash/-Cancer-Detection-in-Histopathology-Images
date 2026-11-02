@@ -260,3 +260,93 @@ def test_predict_explicit_target_class_and_invalid_target_class(api_client):
     )
     assert resp_invalid.status_code == status.HTTP_400_BAD_REQUEST
     assert "Invalid target_class" in resp_invalid.json()["error"]
+
+
+@pytest.mark.django_db
+def test_prediction_authenticated_persists_record_and_history(api_client):
+    """Test that predictions run by authenticated users create PredictionRecord."""
+    from django.contrib.auth.models import User
+    from rest_framework.authtoken.models import Token
+    from apps.predictions.models import PredictionRecord
+
+    user = User.objects.create_user(username="pathologist", password="SecurePassword123!")
+    token = Token.objects.create(user=user)
+    api_client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+
+    img_file = create_test_image_file("patient_sample.png")
+    resp = api_client.post(
+        "/api/predict/",
+        data={"image": img_file, "model_name": "fedavg", "include_gradcam": "true"},
+        format="multipart",
+    )
+    assert resp.status_code == status.HTTP_200_OK
+    data = resp.json()
+    assert "record_id" in data
+    record_id = data["record_id"]
+
+    # Verify database record
+    record = PredictionRecord.objects.get(id=record_id)
+    assert record.user == user
+    assert record.model_name == "fedavg"
+    assert record.predicted_class_id in (0, 1)
+
+    # Verify history list
+    hist_resp = api_client.get("/api/predict/history/")
+    assert hist_resp.status_code == status.HTTP_200_OK
+    hist_data = hist_resp.json()
+    assert hist_data["count"] >= 1
+    assert hist_data["results"][0]["id"] == record_id
+
+
+@pytest.mark.django_db
+def test_prediction_detail_object_level_ownership(api_client):
+    """Test User A cannot read or delete User B's prediction record (returns 403 Forbidden)."""
+    from django.contrib.auth.models import User
+    from rest_framework.authtoken.models import Token
+    from apps.predictions.models import PredictionRecord
+
+    user_a = User.objects.create_user(username="user_a", password="Password123!")
+    user_b = User.objects.create_user(username="user_b", password="Password123!")
+    token_b = Token.objects.create(user=user_b)
+
+    record_a = PredictionRecord.objects.create(
+        user=user_a,
+        model_name="fedavg",
+        model_display_name="Federated ResNet-18 FedAvg",
+        predicted_class_id=1,
+        predicted_class_name="metastasis",
+        confidence=0.98,
+        normal_probability=0.02,
+        metastasis_probability=0.98,
+        inference_time_ms=25.0,
+        image_filename="sample_a.png",
+    )
+
+    # User B attempts to access User A's record
+    api_client.credentials(HTTP_AUTHORIZATION=f"Token {token_b.key}")
+    resp_get = api_client.get(f"/api/predict/history/{record_a.id}/")
+    assert resp_get.status_code == status.HTTP_403_FORBIDDEN
+
+    # User B attempts to delete User A's record
+    resp_del = api_client.delete(f"/api/predict/history/{record_a.id}/")
+    assert resp_del.status_code == status.HTTP_403_FORBIDDEN
+
+
+@pytest.mark.django_db
+def test_prediction_history_unauthenticated_returns_401(api_client):
+    """Test unauthenticated access to history returns 401 Unauthorized."""
+    resp = api_client.get("/api/predict/history/")
+    assert resp.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_prediction_oversized_image_returns_400(api_client):
+    """Test image upload exceeding 10MB limit returns HTTP 400 Bad Request."""
+    # 11 MB dummy content
+    oversized = SimpleUploadedFile("huge.png", b"0" * (11 * 1024 * 1024), content_type="image/png")
+    resp = api_client.post(
+        "/api/predict/",
+        data={"image": oversized, "model_name": "fedavg"},
+        format="multipart",
+    )
+    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert "exceeds maximum" in resp.json()["error"]

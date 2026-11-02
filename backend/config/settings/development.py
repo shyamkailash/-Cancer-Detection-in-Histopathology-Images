@@ -21,17 +21,32 @@ ALLOWED_HOSTS = config(
     cast=lambda v: [s.strip() for s in v.split(',')]
 )
 
-# Database - PostgreSQL
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('POSTGRES_DB', default='cancer_detection'),
-        'USER': config('POSTGRES_USER', default='cancer_user'),
-        'PASSWORD': config('POSTGRES_PASSWORD', default='cancer_password'),
-        'HOST': config('POSTGRES_HOST', default='localhost'),
-        'PORT': config('POSTGRES_PORT', default='5432'),
+# Database - SQLite by default for development, or PostgreSQL when configured
+USE_SQLITE = config(
+    'USE_SQLITE',
+    default=True,
+    cast=lambda v: v.strip().lower() in ('true', '1', 't', 'yes', 'y') if isinstance(v, str) else bool(v)
+)
+
+if USE_SQLITE:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    # Database - PostgreSQL
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('POSTGRES_DB', default='cancer_detection'),
+            'USER': config('POSTGRES_USER', default='cancer_user'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default='cancer_password'),
+            'HOST': config('POSTGRES_HOST', default='localhost'),
+            'PORT': config('POSTGRES_PORT', default='5432'),
+        }
+    }
 
 # Use verbose logging in development
 LOGGING['handlers']['console']['formatter'] = 'verbose'

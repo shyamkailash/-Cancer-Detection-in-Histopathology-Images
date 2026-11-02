@@ -3,14 +3,19 @@ REST API views for Histopathology Cancer Detection predictions and Grad-CAM expl
 """
 
 from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
 from ml.inference.pipeline import get_inference_pipeline
 from ml.inference.model_manager import get_model_manager
+from .models import PredictionRecord
+from .serializers import PredictionRecordSerializer
+
+MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB limit
 
 
 class ModelsListAPIView(APIView):
@@ -77,6 +82,15 @@ class PredictAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if image_file and image_file.size > MAX_IMAGE_SIZE_BYTES:
+            return Response(
+                {
+                    "status": "error",
+                    "error": f"Image file exceeds maximum allowed size (permitted: {MAX_IMAGE_SIZE_BYTES // (1024 * 1024)}MB).",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # 2. Retrieve parameters
         model_name = request.data.get("model_name") or request.data.get("model", "centralized")
         include_gradcam_raw = request.data.get("include_gradcam", True)
@@ -98,6 +112,33 @@ class PredictAPIView(APIView):
                 include_gradcam=include_gradcam,
                 target_class=target_class,
             )
+
+            # 4. Associate and persist record if request is authenticated
+            if request.user and request.user.is_authenticated:
+                try:
+                    overlay_data = None
+                    if result.get("explainability") and "overlay_base64" in result["explainability"]:
+                        overlay_data = result["explainability"]["overlay_base64"]
+
+                    record = PredictionRecord.objects.create(
+                        user=request.user,
+                        model_name=result.get("model", {}).get("id", model_name),
+                        model_display_name=result.get("model", {}).get("display_name", ""),
+                        predicted_class_id=result["prediction"]["class_id"],
+                        predicted_class_name=result["prediction"]["class_name"],
+                        confidence=result["prediction"]["confidence"],
+                        normal_probability=result["prediction"]["probabilities"]["normal"],
+                        metastasis_probability=result["prediction"]["probabilities"]["metastasis"],
+                        inference_time_ms=result.get("inference_time_ms", 0.0),
+                        has_explanation=bool(overlay_data),
+                        target_layer=result.get("explainability", {}).get("target_layer", "") if result.get("explainability") else "",
+                        image_filename=getattr(image_file, "name", "upload.png") if image_file else "base64_upload.png",
+                        overlay_preview=overlay_data,
+                    )
+                    result["record_id"] = record.id
+                except Exception:
+                    pass
+
             return Response(result, status=status.HTTP_200_OK)
 
         except FileNotFoundError as fnf_err:
@@ -186,7 +227,7 @@ class DemoView(APIView):
     <div class="container">
         <header>
             <h1>Privacy-Preserving Federated Cancer Detection</h1>
-            <p class="subtitle">Multi-Site Histopathology Patch Classification & Grad-CAM Visual Explainability</p>
+            <p class="subtitle">OncoLens — Multi-Site Histopathology Patch Classification & Grad-CAM Visual Explainability</p>
         </header>
 
         <div class="grid">
@@ -409,4 +450,69 @@ class DemoView(APIView):
 </body>
 </html>"""
         return HttpResponse(html_content, content_type="text/html")
+
+
+class PredictionHistoryAPIView(APIView):
+    """
+    GET /api/predict/history/
+    List prediction history for the authenticated user.
+
+    DELETE /api/predict/history/
+    Clear all prediction records for the authenticated user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        limit = request.query_params.get("limit", 50)
+        try:
+            limit = max(1, min(int(limit), 100))
+        except (ValueError, TypeError):
+            limit = 50
+
+        records = PredictionRecord.objects.filter(user=request.user).order_by("-created_at")[:limit]
+        serializer = PredictionRecordSerializer(records, many=True)
+        return Response({
+            "status": "success",
+            "count": len(records),
+            "results": serializer.data,
+        }, status=status.HTTP_200_OK)
+
+    def delete(self, request, *args, **kwargs):
+        deleted_count, _ = PredictionRecord.objects.filter(user=request.user).delete()
+        return Response({
+            "status": "success",
+            "message": f"Cleared {deleted_count} prediction records.",
+            "deleted_count": deleted_count,
+        }, status=status.HTTP_200_OK)
+
+
+class PredictionDetailAPIView(APIView):
+    """
+    GET /api/predict/history/<int:pk>/
+    Retrieve a specific prediction record belonging to the authenticated user.
+
+    DELETE /api/predict/history/<int:pk>/
+    Delete a specific prediction record belonging to the authenticated user.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk, *args, **kwargs):
+        record = get_object_or_404(PredictionRecord, pk=pk)
+        if record.user != request.user:
+            return Response(
+                {"detail": "You do not have permission to access this prediction record."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = PredictionRecordSerializer(record)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def delete(self, request, pk, *args, **kwargs):
+        record = get_object_or_404(PredictionRecord, pk=pk)
+        if record.user != request.user:
+            return Response(
+                {"detail": "You do not have permission to delete this prediction record."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        record.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 

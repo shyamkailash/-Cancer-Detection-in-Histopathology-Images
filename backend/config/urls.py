@@ -18,6 +18,7 @@ def api_root(request):
         'version': '0.1.0',
         'endpoints': {
             'health': '/api/health/',
+            'auth': '/api/auth/',
             'predict': '/api/predict/',
             'models': '/api/models/',
             'demo': '/api/demo/',
@@ -30,6 +31,7 @@ def api_root(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', api_root, name='api-root'),
+    path('api/auth/', include('apps.authentication.urls')),
     path('api/', include('apps.core.urls')),
     path('api/', include('apps.predictions.urls')),
     path('api/mlops/', include('apps.mlops.urls')),
