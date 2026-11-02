@@ -43,17 +43,34 @@ def verify_checkpoint(path: Path) -> bool:
 
 
 def download_file(url: str, dest: Path) -> bool:
-    """Download a file with progress reporting."""
+    """Download a file with verification before final placement."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp_dest = dest.with_suffix(".tmp")
-    print(f"Downloading {url} -> {dest}...")
     try:
-        urllib.request.urlretrieve(url, str(tmp_dest))
-        tmp_dest.rename(dest)
-        print(f"Successfully downloaded {dest} ({dest.stat().st_size / (1024 * 1024):.2f} MB)")
-        return True
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Cancer-Detection-Downloader/1.0"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as response:
+            if response.status != 200:
+                return False
+            with open(tmp_dest, "wb") as f_out:
+                while True:
+                    chunk = response.read(65536)
+                    if not chunk:
+                        break
+                    f_out.write(chunk)
+
+        if verify_checkpoint(tmp_dest):
+            tmp_dest.rename(dest)
+            print(f"Successfully downloaded and verified {dest} ({dest.stat().st_size / (1024 * 1024):.2f} MB)")
+            return True
+        else:
+            print(f"Downloaded file from {url} is not a valid checkpoint state dict", file=sys.stderr)
+            if tmp_dest.exists():
+                tmp_dest.unlink()
+            return False
     except Exception as exc:
-        print(f"Failed to download from {url}: {exc}", file=sys.stderr)
         if tmp_dest.exists():
             tmp_dest.unlink()
         return False
@@ -126,14 +143,30 @@ def main() -> int:
     if base_url:
         print(f"\nAttempting to download missing checkpoints from {base_url}...")
         for model_id, rel_path, abs_path in missing:
-            filename = Path(rel_path).name
-            download_url = f"{base_url}/{filename}"
-            if not download_file(download_url, abs_path):
+            p = Path(rel_path)
+            candidate_urls = [
+                f"{base_url}/{rel_path}",
+                f"{base_url}/{model_id}_{p.name}",
+                f"{base_url}/{p.name}",
+            ]
+            if "artifacts" in p.parts:
+                idx = p.parts.index("artifacts")
+                subpath = "/".join(p.parts[idx + 1:])
+                candidate_urls.insert(1, f"{base_url}/{subpath}")
+
+            downloaded = False
+            for cand_url in candidate_urls:
+                print(f"Trying {cand_url} -> {abs_path}...")
+                if download_file(cand_url, abs_path):
+                    downloaded = True
+                    break
+
+            if not downloaded:
                 if allow_synthetic:
                     print(f"Download failed; falling back to synthetic checkpoint for {model_id}...")
                     create_synthetic_checkpoint(abs_path)
                 else:
-                    print(f"Error: Failed to obtain checkpoint for {model_id} from {download_url}", file=sys.stderr)
+                    print(f"Error: Failed to obtain checkpoint for {model_id} from {base_url}", file=sys.stderr)
                     return 1
     elif allow_synthetic:
         print("\nNo CHECKPOINTS_BASE_URL specified. ALLOW_SYNTHETIC_CHECKPOINTS is active; creating test checkpoints...")

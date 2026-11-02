@@ -21,19 +21,39 @@ ALLOWED_HOSTS = config(
 # Render runs behind a reverse proxy that terminates TLS
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-# Database - PostgreSQL
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('POSTGRES_DB'),
-        'USER': config('POSTGRES_USER'),
-        'PASSWORD': config('POSTGRES_PASSWORD'),
-        'HOST': config('POSTGRES_HOST', default='db'),
-        'PORT': config('POSTGRES_PORT', default='5432'),
+# Database - PostgreSQL (supports DATABASE_URL or individual POSTGRES_* variables)
+import urllib.parse
+_database_url = config('DATABASE_URL', default=None)
+if _database_url:
+    _parsed_db = urllib.parse.urlparse(_database_url)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': _parsed_db.path.lstrip('/'),
+            'USER': _parsed_db.username,
+            'PASSWORD': _parsed_db.password,
+            'HOST': _parsed_db.hostname,
+            'PORT': str(_parsed_db.port or 5432),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': config('POSTGRES_DB', default='cancer_detection'),
+            'USER': config('POSTGRES_USER', default='cancer_user'),
+            'PASSWORD': config('POSTGRES_PASSWORD', default='cancer_password'),
+            'HOST': config('POSTGRES_HOST', default='db'),
+            'PORT': config('POSTGRES_PORT', default='5432'),
+        }
+    }
 
 # Security settings
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='https://cancer-detection-in-histopathology.vercel.app,https://cancer-detection-api.onrender.com',
+    cast=lambda v: [s.strip() for s in v.split(',') if s.strip()]
+)
 SECURE_SSL_REDIRECT = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
