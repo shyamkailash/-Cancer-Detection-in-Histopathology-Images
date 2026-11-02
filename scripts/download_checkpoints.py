@@ -3,8 +3,15 @@
 Model Checkpoint Synchronization and Verification Script.
 
 Ensures all 6 production model checkpoints exist locally in the `artifacts/` hierarchy.
-If checkpoints are missing, downloads them from `CHECKPOINTS_BASE_URL` (e.g. GitHub Releases, AWS S3, Cloudflare R2).
-Supports verification-only mode and fallback synthetic weight creation for CI/staging builds.
+If checkpoints are missing, downloads them from `CHECKPOINTS_BASE_URL` or per-model
+environment variables (e.g. GitHub Releases, AWS S3, Cloudflare R2).
+
+Features:
+- Disambiguated remote candidate URLs to avoid collisions on shared filenames (`best_global_model.pt`).
+- Strict PyTorch architecture validation (verifies weights, layer names, and 2-class fc shape).
+- Safe atomic download to temporary files before moving to destination.
+- Strict verify-only mode for CI pipelines.
+- Transparent reporting of missing checkpoints.
 """
 
 import argparse
@@ -17,67 +24,154 @@ import torch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-# Mapping of model ID to relative checkpoint path
-REQUIRED_CHECKPOINTS = {
-    "centralized": "artifacts/checkpoints/pcam_resnet18_best.pt",
-    "centralized_finetuned": "artifacts/finetuning/centralized/best_model.pt",
-    "fedavg": "artifacts/federated/fedavg/best_global_model.pt",
-    "fedprox": "artifacts/federated/fedprox/best_global_model.pt",
-    "fedbn": "artifacts/federated/fedbn/best_global_model.pt",
-    "dp_fedavg": "artifacts/federated/dp_fedavg/best_global_model.pt",
+# Comprehensive checkpoint specification with disambiguated remote filenames
+CHECKPOINT_SPEC = {
+    "centralized": {
+        "rel_path": "artifacts/checkpoints/pcam_resnet18_best.pt",
+        "remote_candidates": [
+            "artifacts/checkpoints/pcam_resnet18_best.pt",
+            "checkpoints/pcam_resnet18_best.pt",
+            "centralized_pcam_resnet18_best.pt",
+            "centralized.pt",
+            "pcam_resnet18_best.pt",
+        ],
+        "env_var": "CHECKPOINT_URL_CENTRALIZED",
+    },
+    "centralized_finetuned": {
+        "rel_path": "artifacts/finetuning/centralized/best_model.pt",
+        "remote_candidates": [
+            "artifacts/finetuning/centralized/best_model.pt",
+            "finetuning/centralized/best_model.pt",
+            "centralized_finetuned_best_model.pt",
+            "centralized_finetuned.pt",
+        ],
+        "env_var": "CHECKPOINT_URL_CENTRALIZED_FINETUNED",
+    },
+    "fedavg": {
+        "rel_path": "artifacts/federated/fedavg/best_global_model.pt",
+        "remote_candidates": [
+            "artifacts/federated/fedavg/best_global_model.pt",
+            "federated/fedavg/best_global_model.pt",
+            "fedavg_best_global_model.pt",
+            "fedavg.pt",
+        ],
+        "env_var": "CHECKPOINT_URL_FEDAVG",
+    },
+    "fedprox": {
+        "rel_path": "artifacts/federated/fedprox/best_global_model.pt",
+        "remote_candidates": [
+            "artifacts/federated/fedprox/best_global_model.pt",
+            "federated/fedprox/best_global_model.pt",
+            "fedprox_best_global_model.pt",
+            "fedprox.pt",
+        ],
+        "env_var": "CHECKPOINT_URL_FEDPROX",
+    },
+    "fedbn": {
+        "rel_path": "artifacts/federated/fedbn/best_global_model.pt",
+        "remote_candidates": [
+            "artifacts/federated/fedbn/best_global_model.pt",
+            "federated/fedbn/best_global_model.pt",
+            "fedbn_best_global_model.pt",
+            "fedbn.pt",
+        ],
+        "env_var": "CHECKPOINT_URL_FEDBN",
+    },
+    "dp_fedavg": {
+        "rel_path": "artifacts/federated/dp_fedavg/best_global_model.pt",
+        "remote_candidates": [
+            "artifacts/federated/dp_fedavg/best_global_model.pt",
+            "federated/dp_fedavg/best_global_model.pt",
+            "dp_fedavg_best_global_model.pt",
+            "dp_fedavg.pt",
+        ],
+        "env_var": "CHECKPOINT_URL_DP_FEDAVG",
+    },
 }
 
 
-def verify_checkpoint(path: Path) -> bool:
-    """Verify that file exists and can be loaded as a PyTorch state dict."""
-    if not path.is_file() or path.stat().st_size == 0:
-        return False
+def verify_checkpoint(path: Path) -> tuple[bool, str]:
+    """Verify that file exists, is readable, and contains a valid ResNet-18 cancer detection state dict."""
+    if not path.is_file():
+        return False, "File does not exist or is not a regular file."
+    if path.stat().st_size < 1_000_000:
+        return False, f"File size too small ({path.stat().st_size} bytes, expected >1MB)."
+
     try:
         data = torch.load(str(path), map_location="cpu", weights_only=False)
-        if isinstance(data, dict):
-            sd = data.get("model_state_dict") or data.get("state_dict") or data
-            return isinstance(sd, dict) and len(sd) > 0
-        return False
-    except Exception:
-        return False
+        if not isinstance(data, dict):
+            return False, "Loaded checkpoint object is not a dictionary."
+
+        sd = data.get("model_state_dict") or data.get("state_dict") or data
+        if not isinstance(sd, dict) or len(sd) < 100:
+            return False, f"State dict has {len(sd) if isinstance(sd, dict) else 0} keys (expected >=100 for ResNet-18)."
+
+        # Normalize module. prefixes
+        cleaned = {k[7:] if k.startswith("module.") else k: v for k, v in sd.items()}
+
+        required_layers = ["conv1.weight", "layer4.1.conv2.weight", "fc.weight", "fc.bias"]
+        for layer in required_layers:
+            if layer not in cleaned:
+                return False, f"Missing required layer '{layer}' in state dict."
+
+        # Verify output layer shape matches binary classification (2 classes)
+        fc_w = cleaned["fc.weight"]
+        fc_b = cleaned["fc.bias"]
+        if tuple(fc_w.shape) != (2, 512):
+            return False, f"Unexpected fc.weight shape {fc_w.shape} (expected (2, 512))."
+        if tuple(fc_b.shape) != (2,):
+            return False, f"Unexpected fc.bias shape {fc_b.shape} (expected (2,))."
+
+        return True, f"Valid ResNet-18 binary classification checkpoint ({len(cleaned)} weights)"
+    except Exception as exc:
+        return False, f"PyTorch load error: {exc}"
 
 
 def download_file(url: str, dest: Path) -> bool:
-    """Download a file with verification before final placement."""
+    """Download a file atomically to a temporary destination and verify before finalizing."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp_dest = dest.with_suffix(".tmp")
+    tmp_dest = dest.with_name(f"{dest.name}.download.tmp")
+
     try:
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "Cancer-Detection-Downloader/1.0"},
+            headers={"User-Agent": "OncoLens-Checkpoint-Downloader/1.0"},
         )
-        with urllib.request.urlopen(req, timeout=60) as response:
+        print(f"  --> Connecting: {url}")
+        with urllib.request.urlopen(req, timeout=90) as response:
             if response.status != 200:
+                print(f"  [HTTP {response.status}] Failed to download from {url}", file=sys.stderr)
                 return False
+
             with open(tmp_dest, "wb") as f_out:
+                bytes_downloaded = 0
                 while True:
                     chunk = response.read(65536)
                     if not chunk:
                         break
                     f_out.write(chunk)
+                    bytes_downloaded += len(chunk)
 
-        if verify_checkpoint(tmp_dest):
-            tmp_dest.rename(dest)
-            print(f"Successfully downloaded and verified {dest} ({dest.stat().st_size / (1024 * 1024):.2f} MB)")
+        is_valid, reason = verify_checkpoint(tmp_dest)
+        if is_valid:
+            tmp_dest.replace(dest)
+            size_mb = dest.stat().st_size / (1024 * 1024)
+            print(f"  [SUCCESS] Verified and installed: {dest.name} ({size_mb:.2f} MB)")
             return True
         else:
-            print(f"Downloaded file from {url} is not a valid checkpoint state dict", file=sys.stderr)
+            print(f"  [INVALID] Downloaded file failed verification: {reason}", file=sys.stderr)
             if tmp_dest.exists():
                 tmp_dest.unlink()
             return False
     except Exception as exc:
+        print(f"  [ERROR] Download failed: {exc}", file=sys.stderr)
         if tmp_dest.exists():
             tmp_dest.unlink()
         return False
 
 
 def create_synthetic_checkpoint(dest: Path) -> None:
-    """Create a synthetic ResNet-18 checkpoint for testing environments only."""
+    """Create a synthetic ResNet-18 checkpoint for test/staging environments only."""
     from ml.models.resnet import create_resnet18
 
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -118,69 +212,72 @@ def main() -> int:
 
     print(f"Checking model checkpoints in {PROJECT_ROOT}...")
 
-    for model_id, rel_path in REQUIRED_CHECKPOINTS.items():
+    for model_id, spec in CHECKPOINT_SPEC.items():
+        rel_path = spec["rel_path"]
         abs_path = (PROJECT_ROOT / rel_path).resolve()
-        if abs_path.exists() and verify_checkpoint(abs_path):
+        is_valid, reason = verify_checkpoint(abs_path)
+        if is_valid:
             size_mb = abs_path.stat().st_size / (1024 * 1024)
             verified.append((model_id, rel_path, size_mb))
-            print(f"  [OK] {model_id}: {rel_path} ({size_mb:.2f} MB)")
+            print(f"  [OK] {model_id:22}: {rel_path} ({size_mb:.2f} MB)")
         else:
-            missing.append((model_id, rel_path, abs_path))
-            print(f"  [MISSING] {model_id}: {rel_path}")
+            missing.append((model_id, spec, abs_path))
+            print(f"  [MISSING] {model_id:22}: {rel_path} ({reason})")
 
     if not missing:
-        print(f"\nAll {len(verified)} model checkpoints are present and valid.")
+        print(f"\nAll {len(verified)} model checkpoints are present, verified, and operational.")
         return 0
 
     if args.verify_only:
-        print(f"\nError: {len(missing)} model checkpoints are missing in verify-only mode.", file=sys.stderr)
+        print(f"\nError: {len(missing)} model checkpoints are missing or invalid in verify-only mode.", file=sys.stderr)
         return 1
 
-    # Attempt to download missing checkpoints
     base_url = args.base_url.rstrip("/") if args.base_url else ""
-    allow_synthetic = args.allow_synthetic or (os.environ.get("ALLOW_SYNTHETIC_CHECKPOINTS", "").lower() in ("1", "true", "yes"))
+    allow_synthetic = args.allow_synthetic or (
+        os.environ.get("ALLOW_SYNTHETIC_CHECKPOINTS", "").lower() in ("1", "true", "yes")
+    )
 
-    if base_url:
-        print(f"\nAttempting to download missing checkpoints from {base_url}...")
-        for model_id, rel_path, abs_path in missing:
-            p = Path(rel_path)
-            candidate_urls = [
-                f"{base_url}/{rel_path}",
-                f"{base_url}/{model_id}_{p.name}",
-                f"{base_url}/{p.name}",
-            ]
-            if "artifacts" in p.parts:
-                idx = p.parts.index("artifacts")
-                subpath = "/".join(p.parts[idx + 1:])
-                candidate_urls.insert(1, f"{base_url}/{subpath}")
+    failed_models = []
+    for model_id, spec, abs_path in missing:
+        rel_path = spec["rel_path"]
+        env_var_name = spec.get("env_var", "")
+        specific_url = os.environ.get(env_var_name, "").strip() if env_var_name else ""
 
-            downloaded = False
-            for cand_url in candidate_urls:
-                print(f"Trying {cand_url} -> {abs_path}...")
+        downloaded = False
+
+        # 1. Try model-specific URL if configured
+        if specific_url:
+            print(f"\nAttempting download for '{model_id}' via {env_var_name}...")
+            if download_file(specific_url, abs_path):
+                downloaded = True
+
+        # 2. Try candidate URLs with base_url
+        if not downloaded and base_url:
+            print(f"\nAttempting download for '{model_id}' from {base_url}...")
+            for cand in spec["remote_candidates"]:
+                cand_url = f"{base_url}/{cand}"
                 if download_file(cand_url, abs_path):
                     downloaded = True
                     break
 
-            if not downloaded:
-                if allow_synthetic:
-                    print(f"Download failed; falling back to synthetic checkpoint for {model_id}...")
-                    create_synthetic_checkpoint(abs_path)
-                else:
-                    print(f"Error: Failed to obtain checkpoint for {model_id} from {base_url}", file=sys.stderr)
-                    return 1
-    elif allow_synthetic:
-        print("\nNo CHECKPOINTS_BASE_URL specified. ALLOW_SYNTHETIC_CHECKPOINTS is active; creating test checkpoints...")
-        for model_id, rel_path, abs_path in missing:
-            create_synthetic_checkpoint(abs_path)
-    else:
-        print("\nError: Model checkpoints are missing and no CHECKPOINTS_BASE_URL was provided.", file=sys.stderr)
-        print("To resolve:", file=sys.stderr)
-        print("1. Set CHECKPOINTS_BASE_URL in your environment pointing to remote storage (e.g. GitHub Releases/S3), OR", file=sys.stderr)
-        print("2. Commit the pruned <45 MB checkpoints directly to the repository, OR", file=sys.stderr)
-        print("3. For test/staging environments, set ALLOW_SYNTHETIC_CHECKPOINTS=1.", file=sys.stderr)
+        # 3. Fallback or record failure
+        if not downloaded:
+            if allow_synthetic:
+                print(f"  [FALLBACK] ALLOW_SYNTHETIC_CHECKPOINTS is active; creating test fixture for {model_id}...")
+                create_synthetic_checkpoint(abs_path)
+            else:
+                failed_models.append((model_id, rel_path))
+
+    if failed_models:
+        print(f"\nError: Failed to obtain valid checkpoints for {len(failed_models)} model(s):", file=sys.stderr)
+        for mid, rpath in failed_models:
+            print(f"  - {mid} (expected at {rpath})", file=sys.stderr)
+        print("\nTo resolve in production:", file=sys.stderr)
+        print("  Set CHECKPOINTS_BASE_URL (or CHECKPOINT_URL_<MODEL_ID>) in your Render dashboard.", file=sys.stderr)
+        print("  Example: CHECKPOINTS_BASE_URL=https://github.com/shyamkailash/-Cancer-Detection-in-Histopathology-Images/releases/download/v1.0.0", file=sys.stderr)
         return 1
 
-    print("\nCheckpoint verification complete.")
+    print("\nCheckpoint synchronization complete.")
     return 0
 
 

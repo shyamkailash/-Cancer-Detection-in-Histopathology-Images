@@ -735,6 +735,12 @@ function Detection({
               <span className={`badge ${isMetastasis ? 'red' : 'green'}`}>
                 {isMetastasis ? 'Metastasis Alert' : 'Normal / Benign'}
               </span>
+            ) : errorMsg ? (
+              <span className="badge red">Inference Failed</span>
+            ) : loading ? (
+              <span className="badge blue">Analyzing...</span>
+            ) : file ? (
+              <span className="badge green">Specimen Ready</span>
             ) : (
               <span className="badge blue">Awaiting Specimen</span>
             )}
@@ -822,10 +828,41 @@ function Detection({
           ) : (
             <div className="result-empty">
               <div className="empty-mark">
-                <BrainCircuit />
+                {errorMsg ? (
+                  <AlertTriangle style={{ color: '#f87171' }} />
+                ) : loading ? (
+                  <RefreshCw className="spin" style={{ color: '#36d399' }} />
+                ) : (
+                  <BrainCircuit />
+                )}
               </div>
-              <h3>No Prediction Executed</h3>
-              <p>Upload a histopathology patch and run inference to see the model output, class probabilities, and Grad-CAM feature localization.</p>
+              <h3>
+                {loading
+                  ? 'Computing Diagnostic Prediction…'
+                  : errorMsg
+                  ? 'Inference Could Not Be Completed'
+                  : file
+                  ? 'Specimen Loaded & Ready'
+                  : 'No Prediction Executed'}
+              </h3>
+              <p>
+                {loading
+                  ? 'Uploading patch, evaluating deep neural network, and backpropagating Grad-CAM. This may take up to a minute if the backend container is spinning up.'
+                  : errorMsg
+                  ? errorMsg
+                  : file
+                  ? 'Click "Run Inference" on the left to evaluate this tissue specimen against the selected model.'
+                  : 'Upload a histopathology patch and run inference to see the model output, class probabilities, and Grad-CAM feature localization.'}
+              </p>
+              {errorMsg && (
+                <button
+                  className="outline-btn"
+                  style={{ marginTop: 12 }}
+                  onClick={runInference}
+                >
+                  <RefreshCw size={13} /> Retry Inference
+                </button>
+              )}
             </div>
           )}
 

@@ -112,11 +112,28 @@ export const authStorage = {
   },
 };
 
-const base = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
+// Determine whether we are in a local environment
+const isLocalhost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname === '0.0.0.0');
 
-async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T>> {
+// In production, default to the official Render API if VITE_API_BASE_URL is not set
+const defaultApiUrl = isLocalhost ? '' : 'https://cancer-detection-api.onrender.com';
+const base = (import.meta.env.VITE_API_BASE_URL || defaultApiUrl).replace(/\/$/, '');
+
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  timeoutMs = 60000
+): Promise<ApiResult<T>> {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 45000);
+  let isTimedOut = false;
+  const timer = window.setTimeout(() => {
+    isTimedOut = true;
+    controller.abort();
+  }, timeoutMs);
 
   const token = authStorage.getToken();
   const headers = new Headers(init?.headers);
@@ -131,8 +148,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
       signal: controller.signal,
     });
 
-    let data: any = null;
     const contentType = res.headers.get('content-type') || '';
+    let data: any = null;
+
     if (contentType.includes('application/json')) {
       data = await res.json();
     } else {
@@ -140,16 +158,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
       try {
         data = JSON.parse(text);
       } catch {
+        // If the server returned HTML (e.g. Cloudflare error or Vercel SPA routing fallback)
+        if (text.trim().startsWith('<')) {
+          const titleMatch = text.match(/<title>([^<]+)<\/title>/i);
+          const title = titleMatch ? titleMatch[1].trim() : `Server returned HTML (${res.status})`;
+          return {
+            data: null,
+            error:
+              res.status >= 500
+                ? `Backend service error (${res.status}): ${title}. The service may be waking up from cold sleep.`
+                : `Unexpected HTML response from ${base || 'server'} (${res.status}): ${title}`,
+            live: false,
+            status: res.status,
+          };
+        }
         data = text ? { message: text } : null;
       }
     }
 
     if (!res.ok) {
       // Extract human-readable error from DRF payload
-      let errorMsg = `Request failed (${res.status})`;
+      let errorMsg = `Request failed (HTTP ${res.status})`;
       if (data && typeof data === 'object') {
         if (typeof data.error === 'string') errorMsg = data.error;
         else if (typeof data.detail === 'string') errorMsg = data.detail;
+        else if (typeof data.message === 'string') errorMsg = data.message;
         else if (Array.isArray(data.non_field_errors)) errorMsg = data.non_field_errors.join(' ');
         else {
           const firstKey = Object.keys(data)[0];
@@ -163,8 +196,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
     }
 
     return { data, error: null, live: true, status: res.status };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Backend unavailable';
+  } catch (error: any) {
+    let msg = 'Backend unavailable';
+    if (isTimedOut || error.name === 'AbortError' || controller.signal.aborted) {
+      msg =
+        'Request timed out. The Render backend may be waking up from cold sleep (free tier spins down on inactivity). Please wait a few seconds and try again.';
+    } else if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      msg = 'Network connection to backend failed. Please verify internet connection or CORS settings.';
+    } else if (error instanceof Error) {
+      msg = error.message;
+    }
     return { data: null, error: msg, live: false };
   } finally {
     window.clearTimeout(timer);
@@ -172,59 +213,93 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResult<T
 }
 
 export const api = {
-  health: () => request<{ status: string; version: string; environment: string }>('/api/health/'),
-  models: () => request<{ status: string; count: number; models: Model[] }>('/api/models/'),
+  getBaseUrl: () => base,
+
+  health: () =>
+    request<{ status: string; version: string; environment: string }>(
+      '/api/health/',
+      undefined,
+      30000
+    ),
+
+  models: () =>
+    request<{ status: string; count: number; models: Model[] }>(
+      '/api/models/',
+      undefined,
+      30000
+    ),
 
   predict: (file: File, model: string, includeGradcam = true) => {
     const form = new FormData();
     form.append('image', file);
     form.append('model_name', model);
     form.append('include_gradcam', includeGradcam ? 'true' : 'false');
-    return request<PredictionResponse>('/api/predict/', {
-      method: 'POST',
-      body: form,
-    });
+    // Notice: Do NOT pass manual Content-Type header so browser sets multipart boundary automatically
+    return request<PredictionResponse>(
+      '/api/predict/',
+      {
+        method: 'POST',
+        body: form,
+      },
+      90000 // 90-second timeout to accommodate PyTorch cold starts on low-memory containers
+    );
   },
 
   predictions: {
     history: (limit = 50) =>
       request<{ status: string; count: number; results: PredictionRecordItem[] }>(
-        `/api/predict/history/?limit=${limit}`
+        `/api/predict/history/?limit=${limit}`,
+        undefined,
+        30000
       ),
-    detail: (id: number) => request<PredictionRecordItem>(`/api/predict/history/${id}/`),
+    detail: (id: number) =>
+      request<PredictionRecordItem>(`/api/predict/history/${id}/`, undefined, 30000),
     delete: (id: number) =>
-      request<{ status: string }>(`/api/predict/history/${id}/`, { method: 'DELETE' }),
+      request<{ status: string }>(`/api/predict/history/${id}/`, { method: 'DELETE' }, 30000),
     clearAll: () =>
       request<{ status: string; message: string; deleted_count: number }>(
         '/api/predict/history/',
-        { method: 'DELETE' }
+        { method: 'DELETE' },
+        30000
       ),
   },
 
   auth: {
     login: (username: string, password: string) =>
-      request<{ token: string; user: UserProfile }>('/api/auth/login/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      }),
+      request<{ token: string; user: UserProfile }>(
+        '/api/auth/login/',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        },
+        30000
+      ),
     register: (username: string, email: string, password: string) =>
-      request<{ token: string; user: UserProfile }>('/api/auth/register/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password }),
-      }),
+      request<{ token: string; user: UserProfile }>(
+        '/api/auth/register/',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, email, password }),
+        },
+        30000
+      ),
     logout: () =>
-      request<{ status: string; detail: string }>('/api/auth/logout/', {
-        method: 'POST',
-      }),
-    me: () => request<UserProfile>('/api/auth/me/'),
+      request<{ status: string; detail: string }>(
+        '/api/auth/logout/',
+        {
+          method: 'POST',
+        },
+        30000
+      ),
+    me: () => request<UserProfile>('/api/auth/me/', undefined, 30000),
   },
 
   mlops: {
-    status: () => request<Record<string, any>>('/api/mlops/status/'),
-    models: () => request<{ status: string; count: number; models: any[] }>('/api/mlops/models/'),
-    runs: () => request<{ status: string; count: number; runs: any[] }>('/api/mlops/runs/'),
-    drift: () => request<Record<string, any>>('/api/mlops/drift/'),
+    status: () => request<Record<string, any>>('/api/mlops/status/', undefined, 30000),
+    models: () => request<{ status: string; count: number; models: any[] }>('/api/mlops/models/', undefined, 30000),
+    runs: () => request<{ status: string; count: number; runs: any[] }>('/api/mlops/runs/', undefined, 30000),
+    drift: () => request<Record<string, any>>('/api/mlops/drift/', undefined, 30000),
   },
 };
