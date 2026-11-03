@@ -24,7 +24,7 @@ services:
       - key: MAX_CACHED_MODELS
         value: "2"
       - key: CHECKPOINTS_BASE_URL
-        sync: false
+        value: "https://github.com/shyamkailash/-Cancer-Detection-in-Histopathology-Images/releases/download/v1.0.0"
       - key: ALLOW_SYNTHETIC_CHECKPOINTS
         value: "0"
       - key: POSTGRES_DB

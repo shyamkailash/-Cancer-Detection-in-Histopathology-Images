@@ -200,10 +200,11 @@ def main() -> int:
         action="store_true",
         help="Allow creating synthetic checkpoints if external downloads are not configured (testing only).",
     )
+    canonical_release_url = "https://github.com/shyamkailash/-Cancer-Detection-in-Histopathology-Images/releases/download/v1.0.0"
     parser.add_argument(
         "--base-url",
-        default=os.environ.get("CHECKPOINTS_BASE_URL", ""),
-        help="Base URL for remote checkpoint storage (e.g. https://.../releases/download/v1.0/).",
+        default=os.environ.get("CHECKPOINTS_BASE_URL", canonical_release_url),
+        help="Base URL for remote checkpoint storage (default: GitHub Releases v1.0.0).",
     )
     args = parser.parse_args()
 
