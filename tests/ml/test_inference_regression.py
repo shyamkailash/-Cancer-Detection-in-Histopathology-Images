@@ -117,6 +117,16 @@ def test_real_sample_inference_predictions_and_probability_constraints():
     if not tumor_sample.exists() or not normal_sample.exists():
         pytest.skip("Test sample images not available")
 
+    # Skip real accuracy assertions if running with synthetic/random CI fixtures
+    from ml.inference.model_manager import get_model_manager
+    mm = get_model_manager()
+    try:
+        sample_ckpt = torch.load(str(mm.resolve_checkpoint_path("centralized")), map_location="cpu", weights_only=False)
+        if isinstance(sample_ckpt, dict) and sample_ckpt.get("ci_synthetic"):
+            pytest.skip("Skipping real accuracy assertion on synthetic random CI fixtures")
+    except Exception:
+        pass
+
     for model_id in ["centralized", "centralized_finetuned", "fedavg"]:
         # Test tumor patch
         res_tum = pipeline.predict(tumor_sample, model_name=model_id, include_gradcam=False)
